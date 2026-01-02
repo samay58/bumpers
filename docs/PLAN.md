@@ -8,8 +8,8 @@
 
 This document tracks implementation progress. Check boxes indicate completion.
 
-**Current Phase:** Phase 2 (The Orb)
-**Overall Progress:** Phase 1 complete, Phase 2-5 pending
+**Current Phase:** Phase 3 (Destination Entry)
+**Overall Progress:** Phase 1-2 complete, Phase 3-5 pending
 
 ---
 
@@ -114,37 +114,37 @@ This document tracks implementation progress. Check boxes indicate completion.
 
 ---
 
-## Phase 2: The Orb 🔄 IN PROGRESS
+## Phase 2: The Orb ✅ COMPLETE
 
 **Goal:** Beautiful, animated orb that shows temperature + direction.
 
 ### OrbView.swift
 
-- [ ] **Gradient rendering**
-  - [ ] Radial gradient from zone colors
-  - [ ] Hot center → dark edges
-  - [ ] Center offset based on `directionShift`
+- [x] **Gradient rendering**
+  - [x] Radial gradient from zone colors
+  - [x] Hot center → dark edges
+  - [x] Center offset based on `directionShift`
 
-- [ ] **Animations**
-  - [ ] Pulse animation (scale 1.0 → 1.02, 2s loop)
-  - [ ] Gradient color transition (0.5s ease)
-  - [ ] "Bump" animation on haptic fire
+- [x] **Animations**
+  - [x] Pulse animation (scale 1.0 → 1.02, 2s loop)
+  - [x] Gradient color transition (0.5s ease)
+  - [x] "Bump" animation on haptic fire
 
-- [ ] **Integration**
-  - [ ] Replace emoji/text zone indicator
-  - [ ] Pass zone and directionShift from ViewModel
+- [x] **Integration**
+  - [x] Replace emoji/text zone indicator
+  - [x] Pass zone and directionShift from ViewModel
 
 ### Animations.swift
 
-- [ ] Custom spring configurations
-- [ ] Pulse modifier
-- [ ] Bump modifier
+- [x] Custom spring configurations
+- [x] Pulse modifier
+- [x] Bump modifier
 
 ### Navigation View Updates
 
-- [ ] Integrate OrbView
-- [ ] Smooth zone transitions
-- [ ] Orb bump triggers on haptic
+- [x] Integrate OrbView
+- [x] Smooth zone transitions
+- [x] Orb bump triggers on haptic
 
 ---
 
@@ -257,8 +257,8 @@ This document tracks implementation progress. Check boxes indicate completion.
 | `Destination.swift` | ✅ Done | 1 |
 | `NavigationViewModel.swift` | ✅ Done | 1 |
 | `NavigationView.swift` | ✅ Done | 1 |
-| `OrbView.swift` | ⏳ Pending | 2 |
-| `Animations.swift` | ⏳ Pending | 2 |
+| `OrbView.swift` | ✅ Done | 2 |
+| `Animations.swift` | ✅ Done | 2 |
 | `HomeView.swift` | ⏳ Pending | 3 |
 | `SearchBar.swift` | ⏳ Pending | 3 |
 | `WanderDial.swift` | ⏳ Pending | 3 |

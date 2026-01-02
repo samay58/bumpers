@@ -29,6 +29,7 @@ final class NavigationViewModel {
     var hasArrived = false
     var startTime: Date?
     var totalDistance: CLLocationDistance = 0
+    var hapticPulseID = 0
 
     // MARK: - Computed Properties
 
@@ -109,12 +110,14 @@ final class NavigationViewModel {
 
     /// Formatted distance string.
     var distanceString: String {
-        let formatter = MeasurementFormatter()
-        formatter.unitOptions = .naturalScale
-        formatter.numberFormatter.maximumFractionDigits = 1
-
         let measurement = Measurement(value: distance, unit: UnitLength.meters)
-        return formatter.string(from: measurement)
+        return Self.distanceFormatter.string(from: measurement)
+    }
+
+    /// Formatted total distance string.
+    var totalDistanceString: String {
+        let measurement = Measurement(value: totalDistance, unit: UnitLength.meters)
+        return Self.distanceFormatter.string(from: measurement)
     }
 
     /// Formatted wander budget string.
@@ -142,6 +145,13 @@ final class NavigationViewModel {
     private var lastZone: TemperatureZone?
     private var previousLocation: CLLocation?
 
+    private static let distanceFormatter: MeasurementFormatter = {
+        let formatter = MeasurementFormatter()
+        formatter.unitOptions = .naturalScale
+        formatter.numberFormatter.maximumFractionDigits = 1
+        return formatter
+    }()
+
     // MARK: - Initialization
 
     init(
@@ -166,6 +176,7 @@ final class NavigationViewModel {
         startTime = Date()
         totalDistance = 0
         previousLocation = nil
+        hapticPulseID = 0
 
         // Keep screen on during navigation
         UIApplication.shared.isIdleTimerDisabled = true
@@ -246,6 +257,7 @@ final class NavigationViewModel {
         hapticService.playForZone(currentZone)
         lastHapticTime = now
         lastZone = currentZone
+        hapticPulseID += 1
     }
 
     private func handleArrival() {

@@ -35,15 +35,12 @@ struct NavigationView: View {
 
                 Spacer()
 
-                // Zone indicator (debug-ish but useful for now)
-                VStack(spacing: 8) {
-                    Text(viewModel.zone.emoji)
-                        .font(.system(size: 60))
-
-                    Text(viewModel.zone.displayName)
-                        .font(Theme.titleFont)
-                        .foregroundStyle(viewModel.zone.colors.inner)
-                }
+                // Orb
+                OrbView(
+                    zone: viewModel.zone,
+                    directionShift: viewModel.directionShift,
+                    bumpTrigger: viewModel.hapticPulseID
+                )
 
                 Spacer()
 
@@ -176,9 +173,7 @@ struct NavigationView: View {
                             .foregroundStyle(Theme.textSecondary)
                     }
 
-                    let distanceFormatter = MeasurementFormatter()
-                    let distanceMeasurement = Measurement(value: viewModel.totalDistance, unit: UnitLength.meters)
-                    Text(distanceFormatter.string(from: distanceMeasurement))
+                    Text(viewModel.totalDistanceString)
                         .font(Theme.captionFont)
                         .foregroundStyle(Theme.textTertiary)
                 }

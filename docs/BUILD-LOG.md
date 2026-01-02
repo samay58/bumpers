@@ -135,6 +135,41 @@ Documentation isn't overhead — it's **continuity insurance**. Next session (or
 
 ---
 
+## Session 3: Orb + Tests
+
+**Date:** 2026-01-01
+**Duration:** ~60 min
+**Phase:** 2 (The Orb) -> Complete
+
+### What We Built
+
+- Added `OrbView` with radial gradient, directional hotspot, and pulse/bump animation hooks
+- Created `Animations.swift` with pulse and bump modifiers
+- Wired orb into `NavigationView`, replacing the emoji zone indicator
+- Added haptic bump trigger in `NavigationViewModel` and cached distance formatting
+- Added unit tests for `NavigationCalculator` and `TemperatureZone`
+
+### Key Decisions Made
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Orb bump trigger | Increment a simple `hapticPulseID` | Avoids tighter coupling between UI and haptic service |
+
+### Learnings
+
+1. Shared `MeasurementFormatter` instances reduce repeated allocations during view updates.
+2. Swift Testing macros make it easy to validate navigation math deterministically.
+
+### What's Next
+
+Phase 3: Destination Entry (HomeView, SearchBar, WanderDial, navigation flow)
+
+### Open Questions
+
+1. Should the orb shadow/glow be tuned after real-device observation?
+
+---
+
 ## Template: Future Sessions
 
 Copy this template for new sessions:
