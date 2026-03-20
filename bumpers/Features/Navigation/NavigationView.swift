@@ -2,7 +2,7 @@
 //  NavigationView.swift
 //  bumpers
 //
-//  Core navigation screen with orb and haptic feedback.
+//  Core navigation screen — orb as light source with full-screen glow.
 //
 
 import SwiftUI
@@ -14,96 +14,264 @@ struct NavigationView: View {
 
     @State var viewModel: NavigationViewModel
     @State private var showDebug = false
+    @State private var showArrival = false
     @Environment(\.dismiss) private var dismiss
+
+    // Glow animation state
+    @State private var glowIntensity: Double = 0.5
+    @State private var glowScale: CGFloat = 1.0
 
     // MARK: - Body
 
     var body: some View {
         ZStack {
-            // Background
+            // Layer 0: Background
             Theme.background
                 .ignoresSafeArea()
 
-            // Main content
-            VStack(spacing: 40) {
-                Spacer()
-
-                // Destination name
-                Text(viewModel.destination.name)
-                    .font(Theme.headlineFont)
-                    .foregroundStyle(Theme.textPrimary)
-
-                Spacer()
-
-                // Orb
-                OrbView(
-                    zone: viewModel.zone,
-                    directionShift: viewModel.directionShift,
-                    bumpTrigger: viewModel.hapticPulseID
+            if !viewModel.isLocationAuthorized {
+                // Permission required
+                PermissionView(
+                    authorizationStatus: viewModel.locationService.authorizationStatus,
+                    onRequestPermission: {
+                        viewModel.locationService.requestPermission()
+                    }
                 )
+            } else {
+                // Layer 1: Full-screen ambient glow
+                ambientGlow
 
-                Spacer()
+                // Layer 2: Diffusion layers (blurred halos)
+                diffusionLayers
 
-                // Distance
+                // Layer 3: Core orb
+                orbCore
+
+                // Layer 4: Floating UI (destination, distance)
+                navigationUI
+
+                // No heading warning (overlay at bottom)
+                if !viewModel.hasHeading && viewModel.isNavigating {
+                    noHeadingWarning
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, 140)
+                }
+            }
+
+            // Debug overlay
+            if showDebug && viewModel.isLocationAuthorized {
+                debugOverlay
+            }
+        }
+        .onTapGesture(count: 3) {
+            showDebug.toggle()
+        }
+        .onChange(of: viewModel.hasArrived) { _, arrived in
+            if arrived {
+                showArrival = true
+            }
+        }
+        .onChange(of: viewModel.zone) { _, _ in
+            // Restart animation on zone change for smooth color transition
+        }
+        .fullScreenCover(isPresented: $showArrival) {
+            ArrivalView(
+                destination: viewModel.destination,
+                walkDuration: viewModel.startTime.map { Date().timeIntervalSince($0) } ?? 0,
+                totalDistance: viewModel.totalDistance,
+                journey: viewModel.buildJourney()
+            )
+            .onDisappear {
+                dismiss()
+            }
+        }
+        .onAppear {
+            viewModel.startNavigation()
+            startAmbientPulse()
+        }
+        .onDisappear {
+            viewModel.stopNavigation()
+        }
+        .navigationBarBackButtonHidden(true)
+        .statusBarHidden(true)
+    }
+
+    // MARK: - Glow Animation
+
+    private func startAmbientPulse() {
+        withAnimation(
+            .easeInOut(duration: Theme.glowPulseDuration)
+            .repeatForever(autoreverses: true)
+        ) {
+            glowIntensity = 1.0
+            glowScale = Theme.glowPulseScale
+        }
+    }
+
+    // MARK: - Layer 1: Ambient Glow (Full-Screen)
+
+    private var ambientGlow: some View {
+        GeometryReader { geo in
+            RadialGradient(
+                colors: [
+                    viewModel.zone.colors.inner.opacity(glowIntensity * 0.35),
+                    viewModel.zone.colors.outer.opacity(glowIntensity * 0.12),
+                    .clear
+                ],
+                center: .center,
+                startRadius: 0,
+                endRadius: geo.size.height * 0.65
+            )
+        }
+        .ignoresSafeArea()
+        .animation(Theme.smoothSpring, value: viewModel.zone)
+    }
+
+    // MARK: - Layer 2: Diffusion Layers
+
+    private var diffusionLayers: some View {
+        ZStack {
+            // Outer halo — large, very soft
+            Circle()
+                .fill(viewModel.zone.colors.inner.opacity(0.12))
+                .scaleEffect(glowScale * 2.8)
+                .blur(radius: 120)
+
+            // Middle glow — medium diffusion
+            Circle()
+                .fill(viewModel.zone.colors.inner.opacity(0.20))
+                .scaleEffect(glowScale * 2.0)
+                .blur(radius: 70)
+
+            // Inner glow — tighter, more saturated
+            Circle()
+                .fill(viewModel.zone.colors.inner.opacity(0.30))
+                .scaleEffect(glowScale * 1.4)
+                .blur(radius: 35)
+        }
+        .frame(width: Theme.orbSize, height: Theme.orbSize)
+        .animation(Theme.smoothSpring, value: viewModel.zone)
+    }
+
+    // MARK: - Layer 3: Core Orb
+
+    private var orbCore: some View {
+        OrbView(
+            zone: viewModel.zone,
+            directionShift: viewModel.directionShift,
+            bumpTrigger: viewModel.hapticPulseID
+        )
+        .scaleEffect(1.0 + (glowScale - 1.0) * 0.3) // Subtle core pulse
+        .accessibilityLabel(orbAccessibilityLabel)
+        .accessibilityHint(orbAccessibilityHint)
+    }
+
+    // MARK: - Layer 4: Navigation UI
+
+    private var navigationUI: some View {
+        VStack {
+            // Top: Destination name
+            Text(viewModel.destination.name)
+                .font(Theme.headlineFont)
+                .foregroundStyle(Theme.textPrimary)
+                .padding(.top, 70)
+                .accessibilityLabel("Navigating to \(viewModel.destination.name)")
+
+            Spacer()
+
+            // Bottom: Distance and info
+            VStack(spacing: 8) {
                 Text(viewModel.distanceString)
-                    .font(Theme.bodyFont)
-                    .foregroundStyle(Theme.textSecondary)
+                    .font(Theme.distanceFont)
+                    .foregroundStyle(viewModel.zone.colors.inner)
+                    .contentTransition(.numericText())
+                    .accessibilityLabel("\(viewModel.distanceString) remaining")
+
+                // GPS accuracy warning
+                if let accuracy = gpsAccuracy, accuracy > 30 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "location.slash")
+                            .font(.system(size: 10, weight: .medium))
+                        Text("±\(Int(accuracy))m")
+                            .font(.system(size: 11, weight: .regular))
+                    }
+                    .foregroundStyle(Theme.cold.inner.opacity(0.7))
+                    .accessibilityLabel("GPS accuracy is \(Int(accuracy)) meters")
+                }
 
                 // Wander budget (if set)
                 if let wanderString = viewModel.wanderBudgetString {
                     Text(wanderString)
                         .font(Theme.captionFont)
                         .foregroundStyle(Theme.textTertiary)
+                        .accessibilityLabel(wanderString)
                 }
-
-                Spacer()
-
-                // No heading warning
-                if !viewModel.hasHeading && viewModel.isNavigating {
-                    noHeadingWarning
-                }
-
-                Spacer()
             }
-            .padding()
-
-            // Debug overlay
-            if showDebug {
-                debugOverlay
-            }
-
-            // Arrival overlay
-            if viewModel.hasArrived {
-                arrivalOverlay
-            }
+            .padding(.bottom, 90)
         }
-        .onTapGesture(count: 3) {
-            showDebug.toggle()
-        }
-        .onAppear {
-            viewModel.startNavigation()
-        }
-        .onDisappear {
-            viewModel.stopNavigation()
-        }
-        .statusBarHidden(true)
     }
 
     // MARK: - Subviews
 
     private var noHeadingWarning: some View {
-        VStack(spacing: 4) {
-            Text("Keep walking for direction")
-                .font(Theme.captionFont)
-                .foregroundStyle(Theme.textTertiary)
+        HStack(spacing: 12) {
+            // Animated compass icon
+            Image(systemName: "location.north.line")
+                .font(.system(size: 18, weight: .light))
+                .foregroundStyle(Theme.warm.inner)
+                .rotationEffect(.degrees(headingAnimationAngle))
+                .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: headingAnimationAngle)
+                .onAppear { headingAnimationAngle = 30 }
 
-            Text("Compass calibrating...")
-                .font(Theme.captionFont)
-                .foregroundStyle(Theme.textTertiary.opacity(0.6))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Finding direction")
+                    .font(Theme.captionFont)
+                    .foregroundStyle(Theme.textSecondary)
+
+                Text(headingHint)
+                    .font(Theme.labelFont)
+                    .foregroundStyle(Theme.textTertiary)
+            }
         }
-        .padding()
-        .background(Color.white.opacity(0.05))
-        .cornerRadius(8)
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.vertical, Theme.Spacing.md)
+        .background(Theme.surfaceSubtle)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                .stroke(Theme.borderSubtle, lineWidth: 1)
+        )
+    }
+
+    @State private var headingAnimationAngle: Double = -30
+
+    private var headingHint: String {
+        if viewModel.locationService.headingAvailable {
+            return "Calibrating compass..."
+        } else {
+            return "Start walking to detect direction"
+        }
+    }
+
+    private var gpsAccuracy: Double? {
+        viewModel.currentLocation?.horizontalAccuracy
+    }
+
+    private var orbAccessibilityLabel: String {
+        let zone = viewModel.zone
+        let direction: String
+        if viewModel.deviation > 15 {
+            direction = "Turn right"
+        } else if viewModel.deviation < -15 {
+            direction = "Turn left"
+        } else {
+            direction = "On track"
+        }
+        return "\(zone.displayName). \(direction)"
+    }
+
+    private var orbAccessibilityHint: String {
+        "Shows your direction relative to destination. Haptic feedback guides you."
     }
 
     private var debugOverlay: some View {
@@ -153,45 +321,6 @@ struct NavigationView: View {
         .padding()
     }
 
-    private var arrivalOverlay: some View {
-        ZStack {
-            Theme.background.opacity(0.95)
-
-            VStack(spacing: 24) {
-                Text("🎉")
-                    .font(.system(size: 80))
-
-                Text("You made it!")
-                    .font(Theme.titleFont)
-                    .foregroundStyle(Theme.textPrimary)
-
-                VStack(spacing: 8) {
-                    if let start = viewModel.startTime {
-                        let duration = Date().timeIntervalSince(start)
-                        Text("\(Int(duration / 60)) min walk")
-                            .font(Theme.bodyFont)
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-
-                    Text(viewModel.totalDistanceString)
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Theme.textTertiary)
-                }
-
-                Button("Done") {
-                    dismiss()
-                }
-                .font(Theme.bodyFont)
-                .foregroundStyle(Theme.textPrimary)
-                .padding(.horizontal, 32)
-                .padding(.vertical, 12)
-                .background(Color.white.opacity(0.1))
-                .cornerRadius(8)
-                .padding(.top, 16)
-            }
-        }
-        .ignoresSafeArea()
-    }
 }
 
 // MARK: - Preview
