@@ -47,11 +47,11 @@ final class Destination {
 
 extension Destination {
 
-    /// Hardcoded test destination: 180º Shop in Roma Norte, CDMX
+    /// Hardcoded test destination: Starbucks Condesa (Temazcal pickup point)
     static let testDestination = Destination(
-        name: "180º Shop",
-        address: "Colima 180, Roma Norte, CDMX",
-        latitude: 19.4184425,
-        longitude: -99.1762134
+        name: "Starbucks Condesa",
+        address: "Alfonso Reyes 218, Hipódromo Condesa, CDMX",
+        latitude: 19.4074986,
+        longitude: -99.1738171
     )
 }

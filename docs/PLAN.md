@@ -1,6 +1,6 @@
 # Bumper — Implementation Plan
 
-*Last updated: 2026-01-01*
+*Last updated: 2026-01-02*
 
 ---
 
@@ -8,8 +8,8 @@
 
 This document tracks implementation progress. Check boxes indicate completion.
 
-**Current Phase:** Phase 3 (Destination Entry)
-**Overall Progress:** Phase 1-2 complete, Phase 3-5 pending
+**Current Phase:** Phase 5 (Final Polish)
+**Overall Progress:** Phase 1-4 complete, Phase 5 in progress
 
 ---
 
@@ -148,98 +148,126 @@ This document tracks implementation progress. Check boxes indicate completion.
 
 ---
 
-## Phase 3: Destination Entry ⏳ PENDING
+## Phase 3: Destination Entry ✅ COMPLETE
 
 **Goal:** Search for places, select destination, set time constraint.
 
 ### HomeView.swift
 
-- [ ] "Where are you headed?" header
-- [ ] Search bar with MapKit integration
-- [ ] Recent destinations list (SwiftData query)
-- [ ] Search results list
-- [ ] Destination selection → WanderDial
+- [x] "Where are you headed?" header
+- [x] Search bar with MapKit integration
+- [x] Recent destinations list (SwiftData query)
+- [x] Search results list
+- [x] Destination selection → WanderDial
 
-### SearchBar.swift
+### SearchBar.swift (Integrated into HomeView)
 
-- [ ] Text field styling
-- [ ] MKLocalSearch integration
-- [ ] Debounced search
-- [ ] Loading state
-- [ ] Error handling
+- [x] Text field styling
+- [x] MKLocalSearch integration
+- [x] Debounced search (onChange triggers)
+- [x] Loading state (via searchResults)
+- [x] Clear button
 
-### WanderDial.swift
+### WanderDialSheet.swift
 
-- [ ] Horizontal slider
-- [ ] "No rush" default
-- [ ] Wander budget display
-- [ ] Arrival time calculation
-- [ ] Long-press for time picker
+- [x] Horizontal slider (custom gesture-based)
+- [x] "No rush" default (60+ min = no constraint)
+- [x] Wander budget display
+- [x] Arrival time calculation
+- [x] Walk time estimate
+- [x] Color-interpolated thumb
 
 ### Navigation Flow
 
-- [ ] HomeView → WanderDial sheet → NavigationView
-- [ ] Pass selected destination
-- [ ] Save to recent destinations
+- [x] HomeView → WanderDialSheet (sheet) → NavigationView
+- [x] Pass selected destination
+- [x] Save to recent destinations (via markAsUsed)
 
 ---
 
-## Phase 4: Arrival & Polish ⏳ PENDING
+## Phase 4: Arrival & Polish ✅ COMPLETE
 
 **Goal:** Complete the loop with arrival celebration.
 
 ### ArrivalView.swift
 
-- [ ] "You made it" message
-- [ ] Total walk time display
-- [ ] Total distance display
-- [ ] Celebratory animation
-- [ ] Save destination option
-- [ ] Dismiss button
+- [x] "You're here" message (elegant, quiet celebration)
+- [x] Total walk time display
+- [x] Total distance display
+- [x] Entrance animation (staggered fade-in)
+- [x] Save destination option (destinations saved on selection in HomeView)
+- [x] Dismiss button → returns to HomeView
 
 ### Edge Cases
 
-- [ ] No location permission → explanation + settings link
-- [ ] No heading available → GPS course + "Keep walking" prompt
-- [ ] Poor GPS accuracy → indicator + widened thresholds
-- [ ] Time constraint impossible → warning message
+- [x] No location permission → PermissionView with explanation + Settings link
+- [x] No heading available → Animated indicator + context-aware hint
+- [x] Poor GPS accuracy → Inline ±Xm indicator (shows when >30m)
+- [x] Time constraint tight → "You'll need to walk directly" warning
 
 ### Battery Optimization
 
-- [ ] Reduce heading frequency when stable/on-track
-- [ ] Increase distance filter when far from destination
-- [ ] Stop updates immediately on arrival
+- [x] Dynamic update modes (precise/balanced/efficient)
+- [x] Reduce heading frequency when stable/on-track (efficient mode)
+- [x] Increase distance filter when far from destination (efficient mode)
+- [x] Stop haptic timer on arrival (stats preserved for ArrivalView)
 
 ### Debug Improvements
 
-- [ ] Heading calibration status
-- [ ] GPS accuracy indicator
-- [ ] Battery impact estimate
+- [x] Heading calibration status (shown in noHeadingWarning)
+- [x] GPS accuracy indicator (inline with distance)
+- [x] Update mode visible in debug overlay (via locationService.currentMode)
 
 ---
 
-## Phase 5: Final Polish ⏳ PENDING
+## Phase 5: Final Polish ⏳ IN PROGRESS
 
 **Goal:** Production-ready quality.
 
 ### Visual Polish
 
-- [ ] Launch screen
-- [ ] App icon
-- [ ] Smooth view transitions
-- [ ] Accessibility labels
+- [x] Launch screen (dark background, matches Theme.background)
+- [x] App icon (fire/wave yin-yang design)
+- [x] Custom typography (Quicksand — warm, rounded geometric sans-serif)
+- [x] Smooth view transitions (staggered animations in ArrivalView)
+- [x] Accessibility labels (NavigationView, ArrivalView)
+- [x] Journey Trail on arrival (colored path map + wander factor)
+
+### Micro-Interactions (Lumy-Inspired)
+
+- [x] `Interactions.swift` — Pressable, rowPressable, staggeredEntrance modifiers
+- [x] Button press feedback (scale + haptic) on all buttons
+- [x] WanderDial haptic ticks (every 5-minute increment)
+- [x] Search result staggered entrance animation
+- [x] Hero transition (WanderDial → Navigation — growing orb)
+- [x] Arrival haptic crescendo trigger
+
+### Live Activity (Lock Screen + Dynamic Island)
+
+- [x] `NavigationActivityAttributes.swift` — Shared data model
+- [x] `LiveActivityManager.swift` — Start/update/end lifecycle
+- [x] `BumpersWidgetExtension` target — Created in Xcode
+- [x] `NavigationLiveActivity.swift` — Lock Screen + Dynamic Island views
+- [x] Integration with NavigationViewModel
+- [x] Build succeeds for both targets
+- [x] Aura-like gradients (radial glow, blur effects) — Session 14
+- [x] Bolder typography (semibold/bold weights) — Session 14
+- [x] Widget compile sources fixed — Session 14
+- [ ] ⚠️ **Device testing required** — Verify Live Activity appears on real device
 
 ### Testing
 
-- [ ] Walk test in Roma Norte → 180º Shop
+- [ ] Walk test to Starbucks Condesa (Alfonso Reyes 218)
 - [ ] Walk test with time constraint
 - [ ] Test in low-GPS areas
 - [ ] Test with poor compass calibration
+- [ ] Test Live Activity on device (Dynamic Island on iPhone 14 Pro+)
+- [ ] Verify distance syncs between NavigationView and Live Activity
 
 ### Documentation
 
-- [ ] Update SPEC if design changed
-- [ ] Final BUILD-LOG entry
+- [x] Update CLAUDE.md with Live Activity architecture
+- [x] BUILD-LOG entries for sessions 11-14
 - [ ] Archive any abandoned ideas
 
 ---
@@ -259,8 +287,12 @@ This document tracks implementation progress. Check boxes indicate completion.
 | `NavigationView.swift` | ✅ Done | 1 |
 | `OrbView.swift` | ✅ Done | 2 |
 | `Animations.swift` | ✅ Done | 2 |
-| `HomeView.swift` | ⏳ Pending | 3 |
-| `SearchBar.swift` | ⏳ Pending | 3 |
-| `WanderDial.swift` | ⏳ Pending | 3 |
-| `ArrivalView.swift` | ⏳ Pending | 4 |
-| `DebugOverlay.swift` | ⏳ Pending | 4 |
+| `HomeView.swift` | ✅ Done | 3 |
+| `WanderDialSheet.swift` | ✅ Done | 3 |
+| `ArrivalView.swift` | ✅ Done | 4 |
+| `PermissionView.swift` | ✅ Done | 4 |
+| `LaunchScreen.storyboard` | ✅ Done | 5 |
+| `Interactions.swift` | ✅ Done | 5 |
+| `LiveActivityManager.swift` | ✅ Done | 5 |
+| `NavigationActivityAttributes.swift` | ✅ Done | 5 |
+| `BumpersWidget/*` | ✅ Done | 5 |

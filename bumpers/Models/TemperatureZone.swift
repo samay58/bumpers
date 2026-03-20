@@ -43,11 +43,11 @@ enum TemperatureZone: String, CaseIterable {
     /// Interval between haptic pulses in seconds.
     var hapticInterval: TimeInterval {
         switch self {
-        case .hot: return 5.0       // Gentle reminder
-        case .warm: return 3.0      // Soft nudge
-        case .cool: return 2.0      // Noticeable
-        case .cold: return 1.5      // Urgent
-        case .freezing: return 0.5  // Continuous
+        case .hot: return 5.0
+        case .warm: return 3.5
+        case .cool: return 2.0
+        case .cold: return 1.2
+        case .freezing: return 0.7
         }
     }
 
@@ -62,6 +62,49 @@ enum TemperatureZone: String, CaseIterable {
         case .cold: return Theme.cold
         case .freezing: return Theme.freezing
         }
+    }
+
+    // MARK: - Visual Properties
+
+    /// Whether this zone requires urgent visual feedback.
+    /// Used for steeper gradient falloff and snappier animations.
+    var isUrgent: Bool {
+        switch self {
+        case .hot, .warm, .cool: return false
+        case .cold, .freezing: return true
+        }
+    }
+
+    /// Zone-responsive pulse scale — more dramatic when off course.
+    var pulseScale: CGFloat {
+        switch self {
+        case .hot: return 1.02
+        case .warm: return 1.025
+        case .cool: return 1.03
+        case .cold: return 1.04
+        case .freezing: return 1.05
+        }
+    }
+
+    /// Zone-responsive spring animation — snappier when urgent.
+    var bumpSpring: Animation {
+        switch self {
+        case .hot:
+            return .spring(response: 0.35, dampingFraction: 0.75)
+        case .warm:
+            return .spring(response: 0.3, dampingFraction: 0.72)
+        case .cool:
+            return .spring(response: 0.25, dampingFraction: 0.68)
+        case .cold:
+            return .spring(response: 0.2, dampingFraction: 0.62)
+        case .freezing:
+            return .spring(response: 0.15, dampingFraction: 0.55)
+        }
+    }
+
+    /// Gradient falloff position — steeper for urgent zones.
+    var gradientFalloff: Double {
+        isUrgent ? Theme.OrbGradient.falloffUrgent : Theme.OrbGradient.falloffRelaxed
     }
 
     // MARK: - Display

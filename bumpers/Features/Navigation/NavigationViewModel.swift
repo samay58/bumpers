@@ -22,6 +22,7 @@ final class NavigationViewModel {
 
     let locationService: LocationService
     let hapticService: HapticService
+    let liveActivityManager: LiveActivityManager
 
     // MARK: - Navigation State
 
@@ -81,6 +82,11 @@ final class NavigationViewModel {
         // Max shift at 90° deviation
         let normalizedDeviation = deviation / 90.0
         return max(-1, min(1, normalizedDeviation))
+    }
+
+    var correctionDirection: CorrectionDirection? {
+        guard zone != .hot else { return nil }
+        return deviation > 0 ? .left : .right
     }
 
     /// Wander budget in seconds (time available beyond minimum walking time).
@@ -145,6 +151,25 @@ final class NavigationViewModel {
     private var lastZone: TemperatureZone?
     private var previousLocation: CLLocation?
 
+    // Zone debounce: require 1.5s stability before switching haptic zone
+    private var pendingZone: TemperatureZone?
+    private var pendingZoneStartTime: Date?
+    private var stableZone: TemperatureZone = .hot
+    private var isFirstPlayInNewZone = false
+
+    private static let zoneDebounceInterval: TimeInterval = 1.5
+
+    // MARK: - Journey Tracking
+
+    private var journeyPoints: [JourneyPoint] = []
+    private var lastSampledLocation: CLLocation?
+    private var lastSampledZone: TemperatureZone?
+
+    private enum JourneySampling {
+        static let minDistanceMeters: CLLocationDistance = 10
+        static let maxTimeSeconds: TimeInterval = 30
+    }
+
     private static let distanceFormatter: MeasurementFormatter = {
         let formatter = MeasurementFormatter()
         formatter.unitOptions = .naturalScale
@@ -158,12 +183,20 @@ final class NavigationViewModel {
         destination: Destination,
         arrivalTime: Date? = nil,
         locationService: LocationService = LocationService(),
-        hapticService: HapticService = HapticService()
+        hapticService: HapticService = HapticService(),
+        liveActivityManager: LiveActivityManager = LiveActivityManager()
     ) {
         self.destination = destination
         self.arrivalTime = arrivalTime
         self.locationService = locationService
         self.hapticService = hapticService
+        self.liveActivityManager = liveActivityManager
+    }
+
+    deinit {
+        // Ensure screen idle timer is re-enabled even if navigation wasn't stopped cleanly
+        UIApplication.shared.isIdleTimerDisabled = false
+        hapticTimer?.invalidate()
     }
 
     // MARK: - Navigation Control
@@ -178,12 +211,24 @@ final class NavigationViewModel {
         previousLocation = nil
         hapticPulseID = 0
 
+        // Reset journey tracking
+        journeyPoints = []
+        lastSampledLocation = nil
+        lastSampledZone = nil
+
         // Keep screen on during navigation
         UIApplication.shared.isIdleTimerDisabled = true
 
         // Start services
         hapticService.prepare()
         locationService.startUpdating()
+
+        // Start Live Activity (Lock Screen + Dynamic Island)
+        liveActivityManager.startNavigation(
+            destinationName: destination.name,
+            zone: zone,
+            distance: distance
+        )
 
         // Start haptic timer
         startHapticTimer()
@@ -199,6 +244,9 @@ final class NavigationViewModel {
         locationService.stopUpdating()
         hapticService.stop()
 
+        // End Live Activity
+        liveActivityManager.endNavigation(showFinalState: false)
+
         // Stop haptic timer
         hapticTimer?.invalidate()
         hapticTimer = nil
@@ -208,9 +256,12 @@ final class NavigationViewModel {
 
     private func startHapticTimer() {
         // Check every 0.5 seconds for haptic timing
-        hapticTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.updateNavigation()
         }
+        // Add to .common mode so timer continues during UI interaction (scrolling, etc.)
+        RunLoop.current.add(timer, forMode: .common)
+        hapticTimer = timer
     }
 
     private func updateNavigation() {
@@ -221,6 +272,15 @@ final class NavigationViewModel {
             totalDistance += current.distance(from: previous)
         }
         previousLocation = currentLocation
+
+        // Sample journey point for trail visualization
+        sampleJourneyPointIfNeeded()
+
+        // Update Live Activity with current state
+        liveActivityManager.updateNavigation(zone: zone, distance: distance)
+
+        // Optimize battery based on navigation state
+        updateLocationMode()
 
         // Check for arrival
         if let current = currentCoordinate,
@@ -233,30 +293,69 @@ final class NavigationViewModel {
         fireHapticsIfNeeded()
     }
 
+    private func updateLocationMode() {
+        let currentZone = zone
+        let currentDistance = distance
+
+        // Precise mode: close to destination or significantly off-track
+        if currentDistance < 200 || currentZone == .cold || currentZone == .freezing {
+            locationService.setMode(.precise)
+        }
+        // Efficient mode: on-track and far from destination
+        else if (currentZone == .hot || currentZone == .warm) && currentDistance > 500 {
+            locationService.setMode(.efficient)
+        }
+        // Balanced mode: everything else
+        else {
+            locationService.setMode(.balanced)
+        }
+    }
+
     private func fireHapticsIfNeeded() {
         guard hasHeading else { return }
 
         let currentZone = zone
         let now = Date()
 
+        // Zone debounce: require 1.5s stability before adopting a new zone
+        if currentZone != stableZone {
+            if pendingZone == currentZone {
+                if let start = pendingZoneStartTime,
+                   now.timeIntervalSince(start) >= Self.zoneDebounceInterval {
+                    stableZone = currentZone
+                    pendingZone = nil
+                    pendingZoneStartTime = nil
+                    isFirstPlayInNewZone = true
+                }
+            } else {
+                pendingZone = currentZone
+                pendingZoneStartTime = now
+            }
+        } else {
+            pendingZone = nil
+            pendingZoneStartTime = nil
+        }
+
         // Check if enough time has passed since last haptic
-        let interval = currentZone.hapticInterval
+        let interval = stableZone.hapticInterval
         if let lastTime = lastHapticTime {
             guard now.timeIntervalSince(lastTime) >= interval else { return }
         }
 
-        // If user just corrected course (zone improved), give them a break
-        if let last = lastZone, currentZone.hapticInterval > last.hapticInterval {
-            // Zone improved — pause haptics for 3 seconds as "reward"
+        // If user just corrected course (zone improved), give them a reward pause
+        if let last = lastZone, stableZone.hapticInterval > last.hapticInterval {
             lastHapticTime = now
-            lastZone = currentZone
+            lastZone = stableZone
             return
         }
 
-        // Fire haptic
-        hapticService.playForZone(currentZone)
+        // Fire haptic with direction and boundary blending
+        let scale: Float = isFirstPlayInNewZone ? 0.75 : 1.0
+        hapticService.playForZone(stableZone, direction: correctionDirection, intensityScale: scale)
+        if isFirstPlayInNewZone { isFirstPlayInNewZone = false }
+
         lastHapticTime = now
-        lastZone = currentZone
+        lastZone = stableZone
         hapticPulseID += 1
     }
 
@@ -266,9 +365,78 @@ final class NavigationViewModel {
         hasArrived = true
         hapticService.playArrival()
 
-        // Keep navigation running briefly to show arrival state
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-            self?.stopNavigation()
+        // End Live Activity with celebration state (shows for 5 seconds)
+        liveActivityManager.endNavigation(showFinalState: true)
+
+        // Stop haptic timer but keep stats available for ArrivalView
+        hapticTimer?.invalidate()
+        hapticTimer = nil
+    }
+
+    // MARK: - Journey Sampling
+
+    private func sampleJourneyPointIfNeeded() {
+        guard let location = currentLocation else { return }
+
+        let now = Date()
+        let currentZone = zone
+
+        // Determine if we should sample
+        var shouldSample = false
+
+        // Reason 1: First point
+        if journeyPoints.isEmpty {
+            shouldSample = true
         }
+
+        // Reason 2: Moved 10+ meters
+        if let lastLocation = lastSampledLocation {
+            let moved = location.distance(from: lastLocation)
+            if moved >= JourneySampling.minDistanceMeters {
+                shouldSample = true
+            }
+        }
+
+        // Reason 3: Zone changed (captures turning points)
+        if let lastZone = lastSampledZone, lastZone != currentZone {
+            shouldSample = true
+        }
+
+        // Reason 4: Time fallback (ensure points even when stationary)
+        if let lastPoint = journeyPoints.last {
+            let elapsed = now.timeIntervalSince(lastPoint.timestamp)
+            if elapsed >= JourneySampling.maxTimeSeconds {
+                shouldSample = true
+            }
+        }
+
+        guard shouldSample else { return }
+
+        // Create and store point
+        let point = JourneyPoint(
+            coordinate: location.coordinate,
+            timestamp: now,
+            zone: currentZone,
+            distanceToDestination: distance
+        )
+        journeyPoints.append(point)
+
+        // Update tracking state
+        lastSampledLocation = location
+        lastSampledZone = currentZone
+    }
+
+    // MARK: - Journey Export
+
+    /// Build the complete journey for display in ArrivalView.
+    func buildJourney() -> Journey? {
+        guard let start = startTime, !journeyPoints.isEmpty else { return nil }
+
+        return Journey(
+            destination: destination,
+            startTime: start,
+            endTime: Date(),
+            points: journeyPoints
+        )
     }
 }

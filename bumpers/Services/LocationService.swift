@@ -12,12 +12,37 @@ import Combine
 @Observable
 final class LocationService: NSObject {
 
+    // MARK: - Update Mode
+
+    enum UpdateMode {
+        case precise    // Close to destination or off-track
+        case balanced   // Normal navigation
+        case efficient  // On-track and far from destination
+
+        var distanceFilter: CLLocationDistance {
+            switch self {
+            case .precise:   return 3
+            case .balanced:  return 5
+            case .efficient: return 15
+            }
+        }
+
+        var headingFilter: CLLocationDegrees {
+            switch self {
+            case .precise:   return 3
+            case .balanced:  return 5
+            case .efficient: return 10
+            }
+        }
+    }
+
     // MARK: - Published State
 
     var currentLocation: CLLocation?
     var currentHeading: CLHeading?
     var authorizationStatus: CLAuthorizationStatus = .notDetermined
     var locationError: Error?
+    private(set) var currentMode: UpdateMode = .balanced
 
     // MARK: - Computed Properties
 
@@ -98,6 +123,15 @@ final class LocationService: NSObject {
     func stopUpdating() {
         locationManager.stopUpdatingLocation()
         locationManager.stopUpdatingHeading()
+    }
+
+    /// Adjust update frequency for battery optimization.
+    /// Call this based on navigation state (zone, distance).
+    func setMode(_ mode: UpdateMode) {
+        guard mode != currentMode else { return }
+        currentMode = mode
+        locationManager.distanceFilter = mode.distanceFilter
+        locationManager.headingFilter = mode.headingFilter
     }
 }
 

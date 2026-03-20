@@ -6,7 +6,20 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		460189292F07BB4300025CED /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 460189282F07BB4300025CED /* WidgetKit.framework */; };
+		4601892B2F07BB4300025CED /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4601892A2F07BB4300025CED /* SwiftUI.framework */; };
+		4601893A2F07BB4300025CED /* BumpersWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 460189262F07BB4300025CED /* BumpersWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
+		460189382F07BB4300025CED /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 46BE92772F07747000916A0D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 460189252F07BB4300025CED;
+			remoteInfo = BumpersWidgetExtension;
+		};
 		46BE928F2F07747100916A0D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 46BE92772F07747000916A0D /* Project object */;
@@ -23,13 +36,48 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		4601893F2F07BB4300025CED /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				4601893A2F07BB4300025CED /* BumpersWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		460189262F07BB4300025CED /* BumpersWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BumpersWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		460189282F07BB4300025CED /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		4601892A2F07BB4300025CED /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		46BE927F2F07747000916A0D /* bumpers.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = bumpers.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		46BE928E2F07747100916A0D /* bumpersTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = bumpersTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		46BE92982F07747100916A0D /* bumpersUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = bumpersUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4601893B2F07BB4300025CED /* Exceptions for "BumpersWidget" folder in "BumpersWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 460189252F07BB4300025CED /* BumpersWidgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		4601892C2F07BB4300025CED /* BumpersWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4601893B2F07BB4300025CED /* Exceptions for "BumpersWidget" folder in "BumpersWidgetExtension" target */,
+			);
+			path = BumpersWidget;
+			sourceTree = "<group>";
+		};
 		46BE92812F07747000916A0D /* bumpers */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = bumpers;
@@ -48,6 +96,15 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		460189232F07BB4300025CED /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4601892B2F07BB4300025CED /* SwiftUI.framework in Frameworks */,
+				460189292F07BB4300025CED /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		46BE927C2F07747000916A0D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -72,12 +129,23 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		460189272F07BB4300025CED /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				460189282F07BB4300025CED /* WidgetKit.framework */,
+				4601892A2F07BB4300025CED /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		46BE92762F07747000916A0D = {
 			isa = PBXGroup;
 			children = (
 				46BE92812F07747000916A0D /* bumpers */,
 				46BE92912F07747100916A0D /* bumpersTests */,
 				46BE929B2F07747100916A0D /* bumpersUITests */,
+				4601892C2F07BB4300025CED /* BumpersWidget */,
+				460189272F07BB4300025CED /* Frameworks */,
 				46BE92802F07747000916A0D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,6 +156,7 @@
 				46BE927F2F07747000916A0D /* bumpers.app */,
 				46BE928E2F07747100916A0D /* bumpersTests.xctest */,
 				46BE92982F07747100916A0D /* bumpersUITests.xctest */,
+				460189262F07BB4300025CED /* BumpersWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,6 +164,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		460189252F07BB4300025CED /* BumpersWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4601893C2F07BB4300025CED /* Build configuration list for PBXNativeTarget "BumpersWidgetExtension" */;
+			buildPhases = (
+				460189222F07BB4300025CED /* Sources */,
+				460189232F07BB4300025CED /* Frameworks */,
+				460189242F07BB4300025CED /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4601892C2F07BB4300025CED /* BumpersWidget */,
+			);
+			name = BumpersWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = BumpersWidgetExtension;
+			productReference = 460189262F07BB4300025CED /* BumpersWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		46BE927E2F07747000916A0D /* bumpers */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 46BE92A22F07747100916A0D /* Build configuration list for PBXNativeTarget "bumpers" */;
@@ -102,10 +193,12 @@
 				46BE927B2F07747000916A0D /* Sources */,
 				46BE927C2F07747000916A0D /* Frameworks */,
 				46BE927D2F07747000916A0D /* Resources */,
+				4601893F2F07BB4300025CED /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				460189392F07BB4300025CED /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				46BE92812F07747000916A0D /* bumpers */,
@@ -173,6 +266,9 @@
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					460189252F07BB4300025CED = {
+						CreatedOnToolsVersion = 26.2;
+					};
 					46BE927E2F07747000916A0D = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -203,11 +299,19 @@
 				46BE927E2F07747000916A0D /* bumpers */,
 				46BE928D2F07747100916A0D /* bumpersTests */,
 				46BE92972F07747100916A0D /* bumpersUITests */,
+				460189252F07BB4300025CED /* BumpersWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		460189242F07BB4300025CED /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		46BE927D2F07747000916A0D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -232,6 +336,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		460189222F07BB4300025CED /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		46BE927B2F07747000916A0D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -256,6 +367,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		460189392F07BB4300025CED /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 460189252F07BB4300025CED /* BumpersWidgetExtension */;
+			targetProxy = 460189382F07BB4300025CED /* PBXContainerItemProxy */;
+		};
 		46BE92902F07747100916A0D /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 46BE927E2F07747000916A0D /* bumpers */;
@@ -269,6 +385,68 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		4601893D2F07BB4300025CED /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = ZL5U59XBJ6;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BumpersWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BumpersWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = samayd.bumpers.BumpersWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		4601893E2F07BB4300025CED /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = ZL5U59XBJ6;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BumpersWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BumpersWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = samayd.bumpers.BumpersWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		46BE92A02F07747100916A0D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -322,7 +500,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -380,7 +558,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -400,6 +578,7 @@
 				DEVELOPMENT_TEAM = ZL5U59XBJ6;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Bumper uses your location to guide you toward your destination.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -433,6 +612,7 @@
 				DEVELOPMENT_TEAM = ZL5U59XBJ6;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Bumper uses your location to guide you toward your destination.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -464,7 +644,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ZL5U59XBJ6;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = samayd.bumpersTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -486,7 +666,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ZL5U59XBJ6;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = samayd.bumpersTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -543,6 +723,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		4601893C2F07BB4300025CED /* Build configuration list for PBXNativeTarget "BumpersWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4601893D2F07BB4300025CED /* Debug */,
+				4601893E2F07BB4300025CED /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		46BE927A2F07747000916A0D /* Build configuration list for PBXProject "bumpers" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -2,7 +2,8 @@
 //  HapticService.swift
 //  bumpers
 //
-//  Core Haptics wrapper for navigation feedback.
+//  Core Haptics wrapper for directional navigation feedback.
+//  Direction is encoded in tap sequence order: rising = correct right, falling = correct left.
 //
 
 import Foundation
@@ -16,13 +17,11 @@ final class HapticService {
     private var engine: CHHapticEngine?
     private var isEngineRunning = false
 
-    /// Fallback generators for when Core Haptics isn't available
     private let impactLight = UIImpactFeedbackGenerator(style: .light)
     private let impactMedium = UIImpactFeedbackGenerator(style: .medium)
     private let impactHeavy = UIImpactFeedbackGenerator(style: .heavy)
     private let notificationGenerator = UINotificationFeedbackGenerator()
 
-    /// Check if device supports Core Haptics
     var supportsHaptics: Bool {
         CHHapticEngine.capabilitiesForHardware().supportsHaptics
     }
@@ -42,14 +41,16 @@ final class HapticService {
             engine = try CHHapticEngine()
             engine?.isAutoShutdownEnabled = true
 
-            // Handle engine stopping
-            engine?.stoppedHandler = { [weak self] reason in
-                self?.isEngineRunning = false
+            engine?.stoppedHandler = { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.isEngineRunning = false
+                }
             }
 
-            // Handle engine reset
             engine?.resetHandler = { [weak self] in
-                self?.restartEngine()
+                DispatchQueue.main.async {
+                    self?.restartEngine()
+                }
             }
 
             try engine?.start()
@@ -80,194 +81,187 @@ final class HapticService {
         notificationGenerator.prepare()
     }
 
-    // MARK: - Haptic Patterns
+    // MARK: - Public API
 
-    /// Gentle single tap — "You're on track"
-    func playOnTrackPulse() {
-        guard supportsHaptics, isEngineRunning else {
-            impactLight.impactOccurred()
-            return
-        }
-
-        let events = [
-            CHHapticEvent(
-                eventType: .hapticTransient,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.4),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.3)
-                ],
-                relativeTime: 0
-            )
-        ]
-
-        playPattern(events: events)
-    }
-
-    /// Double tap — "You're veering slightly"
-    func playVeerWarning() {
-        guard supportsHaptics, isEngineRunning else {
-            impactMedium.impactOccurred()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.impactMedium.impactOccurred()
+    func playForZone(_ zone: TemperatureZone, direction: CorrectionDirection? = nil, intensityScale: Float = 1.0) {
+        switch zone {
+        case .hot:
+            playNod(intensityScale: intensityScale)
+        case .warm, .cool, .cold, .freezing:
+            if let direction = direction {
+                playDirectional(zone: zone, direction: direction, intensityScale: intensityScale)
+            } else {
+                playNod(intensityScale: intensityScale)
             }
-            return
         }
-
-        let events = [
-            CHHapticEvent(
-                eventType: .hapticTransient,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5)
-                ],
-                relativeTime: 0
-            ),
-            CHHapticEvent(
-                eventType: .hapticTransient,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5)
-                ],
-                relativeTime: 0.1
-            )
-        ]
-
-        playPattern(events: events)
     }
 
-    /// Triple tap — "You're off course"
-    func playOffCourseAlert() {
-        guard supportsHaptics, isEngineRunning else {
-            notificationGenerator.notificationOccurred(.warning)
-            return
-        }
-
-        let events = [
-            CHHapticEvent(
-                eventType: .hapticTransient,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.7)
-                ],
-                relativeTime: 0
-            ),
-            CHHapticEvent(
-                eventType: .hapticTransient,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.7)
-                ],
-                relativeTime: 0.08
-            ),
-            CHHapticEvent(
-                eventType: .hapticTransient,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.7)
-                ],
-                relativeTime: 0.16
-            )
-        ]
-
-        playPattern(events: events)
-    }
-
-    /// Continuous gentle buzz — "You're going the wrong way"
-    func playWrongWayBuzz() {
-        guard supportsHaptics, isEngineRunning else {
-            notificationGenerator.notificationOccurred(.error)
-            return
-        }
-
-        let events = [
-            CHHapticEvent(
-                eventType: .hapticContinuous,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.3)
-                ],
-                relativeTime: 0,
-                duration: 0.5
-            )
-        ]
-
-        playPattern(events: events)
-    }
-
-    /// Celebratory pattern — "You made it!"
     func playArrival() {
         guard supportsHaptics, isEngineRunning else {
             notificationGenerator.notificationOccurred(.success)
             return
         }
 
-        // Rising intensity taps followed by a satisfying buzz
         let events = [
-            // Rising taps
-            CHHapticEvent(
-                eventType: .hapticTransient,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5)
-                ],
-                relativeTime: 0
-            ),
-            CHHapticEvent(
-                eventType: .hapticTransient,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.6)
-                ],
-                relativeTime: 0.08
-            ),
-            CHHapticEvent(
-                eventType: .hapticTransient,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.7),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.7)
-                ],
-                relativeTime: 0.16
-            ),
-            CHHapticEvent(
-                eventType: .hapticTransient,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.8)
-                ],
-                relativeTime: 0.24
-            ),
-            // Final satisfying buzz
-            CHHapticEvent(
-                eventType: .hapticContinuous,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.4)
-                ],
-                relativeTime: 0.4,
-                duration: 0.3
-            )
+            makeTransient(at: 0.0, intensity: 0.30, sharpness: 0.50),
+            makeTransient(at: 0.12, intensity: 0.50, sharpness: 0.55),
+            makeTransient(at: 0.24, intensity: 0.70, sharpness: 0.60),
+            makeTransient(at: 0.36, intensity: 0.90, sharpness: 0.70),
+            makeContinuous(at: 0.45, intensity: 0.60, sharpness: 0.15, duration: 0.6,
+                           attackTime: 0.05, releaseTime: 0.4),
         ]
 
         playPattern(events: events)
     }
 
-    /// Play haptic for a specific temperature zone.
-    func playForZone(_ zone: TemperatureZone) {
+    // MARK: - Hot Zone: The Nod
+
+    private func playNod(intensityScale: Float) {
+        guard supportsHaptics, isEngineRunning else {
+            impactLight.impactOccurred(intensity: CGFloat(0.35 * intensityScale))
+            return
+        }
+
+        let events = [
+            makeTransient(at: 0.0, intensity: 0.35 * intensityScale, sharpness: 0.55),
+            makeContinuous(at: 0.02, intensity: 0.15 * intensityScale, sharpness: 0.10, duration: 0.08),
+        ]
+
+        playPattern(events: events)
+    }
+
+    // MARK: - Directional Patterns
+
+    private func playDirectional(zone: TemperatureZone, direction: CorrectionDirection, intensityScale: Float) {
+        guard supportsHaptics, isEngineRunning else {
+            playFallback(zone: zone)
+            return
+        }
+
+        let events: [CHHapticEvent]
+
         switch zone {
-        case .hot:
-            playOnTrackPulse()
         case .warm:
-            playVeerWarning()
+            events = makeDirectionalTaps(
+                intensities: [0.25, 0.45],
+                sharpness: 0.65,
+                gap: 0.08,
+                direction: direction,
+                intensityScale: intensityScale
+            )
         case .cool:
-            playOffCourseAlert()
+            events = makeDirectionalTaps(
+                intensities: [0.25, 0.60],
+                sharpness: 0.70,
+                gap: 0.07,
+                direction: direction,
+                intensityScale: intensityScale
+            )
         case .cold:
-            playOffCourseAlert()
+            events = makeDirectionalTaps(
+                intensities: [0.25, 0.50, 0.75],
+                sharpness: 0.75,
+                gap: 0.06,
+                direction: direction,
+                intensityScale: intensityScale
+            )
         case .freezing:
-            playWrongWayBuzz()
+            let taps = makeDirectionalTaps(
+                intensities: [0.20, 0.45, 0.65, 0.85],
+                sharpness: 0.80,
+                gap: 0.05,
+                direction: direction,
+                intensityScale: intensityScale
+            )
+            let rumble = makeContinuous(
+                at: 0.0,
+                intensity: 0.30 * intensityScale,
+                sharpness: 0.05,
+                duration: 0.25
+            )
+            events = [rumble] + taps
+        default:
+            return
+        }
+
+        playPattern(events: events)
+    }
+
+    // MARK: - Pattern Builder
+
+    private func makeDirectionalTaps(
+        intensities: [Float],
+        sharpness: Float,
+        gap: TimeInterval,
+        direction: CorrectionDirection,
+        intensityScale: Float
+    ) -> [CHHapticEvent] {
+        let ordered = direction == .right ? intensities : intensities.reversed()
+
+        return ordered.enumerated().map { index, intensity in
+            makeTransient(
+                at: Double(index) * gap,
+                intensity: intensity * intensityScale,
+                sharpness: sharpness
+            )
         }
     }
 
-    // MARK: - Private Helpers
+    // MARK: - UIKit Fallback
+
+    private func playFallback(zone: TemperatureZone) {
+        switch zone {
+        case .hot:
+            impactLight.impactOccurred(intensity: 0.4)
+        case .warm:
+            impactMedium.impactOccurred()
+        case .cool:
+            notificationGenerator.notificationOccurred(.warning)
+        case .cold:
+            impactHeavy.impactOccurred()
+        case .freezing:
+            notificationGenerator.notificationOccurred(.error)
+        }
+    }
+
+    // MARK: - Event Helpers
+
+    private func makeTransient(at time: TimeInterval, intensity: Float, sharpness: Float) -> CHHapticEvent {
+        CHHapticEvent(
+            eventType: .hapticTransient,
+            parameters: [
+                CHHapticEventParameter(parameterID: .hapticIntensity, value: intensity),
+                CHHapticEventParameter(parameterID: .hapticSharpness, value: sharpness),
+            ],
+            relativeTime: time
+        )
+    }
+
+    private func makeContinuous(
+        at time: TimeInterval,
+        intensity: Float,
+        sharpness: Float,
+        duration: TimeInterval,
+        attackTime: Float? = nil,
+        releaseTime: Float? = nil
+    ) -> CHHapticEvent {
+        var params = [
+            CHHapticEventParameter(parameterID: .hapticIntensity, value: intensity),
+            CHHapticEventParameter(parameterID: .hapticSharpness, value: sharpness),
+        ]
+        if let attack = attackTime {
+            params.append(CHHapticEventParameter(parameterID: .attackTime, value: attack))
+        }
+        if let release = releaseTime {
+            params.append(CHHapticEventParameter(parameterID: .releaseTime, value: release))
+        }
+        return CHHapticEvent(
+            eventType: .hapticContinuous,
+            parameters: params,
+            relativeTime: time,
+            duration: duration
+        )
+    }
 
     private func playPattern(events: [CHHapticEvent]) {
         guard let engine = engine else { return }

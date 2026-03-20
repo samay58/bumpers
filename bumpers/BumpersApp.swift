@@ -33,12 +33,7 @@ struct BumpersApp: App {
 
     var body: some Scene {
         WindowGroup {
-            // For v1: Go straight to navigation with hardcoded destination
-            NavigationView(
-                viewModel: NavigationViewModel(
-                    destination: .testDestination
-                )
-            )
+            HomeView()
         }
         .modelContainer(sharedModelContainer)
     }
