@@ -1,6 +1,6 @@
 # Bumper — Specification
 
-*Version 1.0 — 2026-01-01*
+*Version 2.0 — 2026-04-27*
 
 ---
 
@@ -10,7 +10,7 @@ GPS navigation has made us mindless route-followers. We stare at blue lines, mis
 
 ## The Solution
 
-Bumper is a "hot or cold" navigation app that guides you toward your destination using haptic feedback and a minimal visual interface—without prescribing a specific route. You're free to wander, explore, and take whatever path feels interesting. The app gently "bumps" you back on track when you veer too far or run low on time.
+Bumper guides you toward your destination using haptic feedback and a minimal visual interface, without exposing turn-by-turn directions. Internally it uses walking routes to create a loose corridor. You can wander, explore, and choose interesting streets, but the app bumps you back when you leave the useful envelope or start making bad progress.
 
 ## Core Metaphor
 
@@ -22,14 +22,14 @@ Think of bowling bumpers: you can bounce around within the lane, but you'll stil
 
 ### 1. Launch → Set Destination
 - App opens to a clean destination entry screen
-- Search field at top (uses MapKit search)
+- Search field at top (uses MapKit suggestions and search)
 - Recent destinations below (stored locally, last 10)
-- User taps a result or searches for address
+- User taps a suggestion, result, exact address, or POI
 
 ### 2. Set Time Constraint (Optional)
 - After destination selected: "When do you need to arrive?"
 - Options:
-  - "No rush" (default) — pure directional guidance, no time pressure
+  - "No rush" (default) — route-aware corridor guidance, no time pressure
   - Time picker — user sets arrival deadline
 - If time set: app calculates walking time and shows "wander budget"
   - Example: "25 min to destination • You have ~40 min of wander time"
@@ -41,7 +41,7 @@ Think of bowling bumpers: you can bounce around within the lane, but you'll stil
 - Screen serves as glanceable confirmation when they do look
 
 ### 4. Arrival
-- When within ~50m of destination: celebratory haptic + visual
+- When inside the dynamic arrival radius for ~3 seconds: celebratory haptic + visual
 - "You made it" with total walk time / distance
 - Option to save destination or just dismiss
 
@@ -49,29 +49,68 @@ Think of bowling bumpers: you can bounce around within the lane, but you'll stil
 
 ## Navigation Logic
 
+### V2 Route-Aware Corridor
+
+Primary guidance uses MapKit walking routes internally:
+
+```
+walking routes -> route corridor -> nearest projection -> progress trend -> correction instruction
+```
+
+The route is never shown as a blue line during active navigation. The user sees a calm instrument, not turn-by-turn instructions.
+
+User-facing looseness modes:
+
+| Mode | Label | Baseline Corridor |
+|------|-------|-------------------|
+| Direct | Keep me close | 35m |
+| Room to wander | Give me space | 75m |
+| Scenic | Let me drift | 125m |
+
+The corridor tightens near arrival and can tighten when the user has a tight arrival time. If the user is making progress without time pressure, it can widen slightly.
+
+Engine states:
+
+| State | Behavior |
+|-------|----------|
+| Acquiring location | No directional haptics |
+| Low confidence | Neutral warning only |
+| In lane | Silence by default |
+| Drifting | Directional correction |
+| Off course | Stronger directional correction |
+| Wrong way | Rumble plus directional correction |
+| Arrived | Single arrival crescendo |
+
+### Fallback Calculation
+
+If MapKit returns no walking route, Bumper falls back to simple direction guidance and shows "Using simple direction guidance."
+
 ### Core Calculation
 ```
 bearing_to_destination = calculate_bearing(current_location, destination)
 user_heading = device_heading (from compass/motion)
-deviation = normalize_angle(user_heading - bearing_to_destination)
+deviation = normalize_angle(bearing_to_destination - user_heading)
 ```
 
 - `deviation` of 0° = walking directly toward destination
 - `deviation` of ±180° = walking directly away
-- We care about deviation magnitude and sign (left vs right)
+- Positive deviation = correct right
+- Negative deviation = correct left
 
-### Zones (Deviation Thresholds)
+### Fallback Zones (Deviation Thresholds)
+
+These zones are used for simple bearing fallback and visual temperature. Primary V2 haptics come from corridor state and `HapticPatternFactory`.
 
 | Zone | Deviation | State | Haptic | Visual |
 |------|-----------|-------|--------|--------|
-| On Track | 0° - 20° | Hot | Gentle pulse every 5s | Warm red/orange orb |
-| Slight Veer | 20° - 45° | Warm | Soft tap every 3s | Orange orb |
-| Veering | 45° - 90° | Cool | Double tap every 2s | Yellow-green orb |
-| Off Course | 90° - 135° | Cold | Triple tap every 1.5s | Blue-green orb |
-| Wrong Way | 135° - 180° | Freezing | Continuous gentle buzz | Blue/purple orb |
+| On Track | 0° - 20° | Hot | Silent by default | Warm red/orange orb |
+| Slight Veer | 20° - 45° | Warm | Directional correction if stable | Orange orb |
+| Veering | 45° - 90° | Cool | Medium correction | Yellow-green orb |
+| Off Course | 90° - 135° | Cold | Strong correction | Blue-green orb |
+| Wrong Way | 135° - 180° | Freezing | Rumble + direction | Blue/purple orb |
 
 ### Haptic Directionality
-Use haptic *patterns* to indicate urgency. For v1, simpler approach: intensity = how off course. True directional haptics are limited on iPhone.
+Use duration-rhythm patterns for pocket legibility. Correct right is short-long. Correct left is long-short. Strong corrections repeat the signature. Wrong way adds a long rumble before the directional signature.
 
 ### Time-Aware Mode
 When user sets an arrival time:
@@ -87,13 +126,8 @@ buffer = remaining_time - min_travel_time
 - **Active Guide** (buffer 2-5 min): Frequent haptics, tighter thresholds
 - **Urgent** (buffer < 2 min): Continuous guidance, narrow tolerance
 
-### Obstacle Handling (v1 Approach)
-We're NOT doing turn-by-turn routing. The "bumper" philosophy means:
-- User figures out obstacles themselves
-- If they hit a dead end, they naturally veer, and the app guides them back
-- This is a feature, not a bug—it builds spatial awareness
-
-For v1, pure crow-flies bearing is fine. User will learn to anticipate obstacles.
+### Obstacle Handling
+Bumper does not give street names or turn-by-turn instructions. It does use route geometry internally so it does not nag the user toward impossible crow-flies paths through buildings, parks, highways, or blocked streets.
 
 ---
 
@@ -106,7 +140,7 @@ Inspired by Rauno Freiberg's work: minimal, typography-focused, fluid animations
 ```
 ┌─────────────────────────────────┐
 │                                 │
-│         Destination Name        │  ← SF Pro Display, Light, 17pt, white
+│         Destination Name        │  ← Quicksand, medium/light, 17pt
 │                                 │
 │                                 │
 │                                 │
@@ -117,9 +151,9 @@ Inspired by Rauno Freiberg's work: minimal, typography-focused, fluid animations
 │           └───────┘             │
 │                                 │
 │                                 │
-│            0.4 mi               │  ← SF Pro, Regular, 15pt, 60% white
+│            0.4 mi               │  ← Quicksand, large, quiet
 │                                 │
-│       ~20 min wander time       │  ← SF Pro, Light, 13pt, 40% white
+│       ~20 min wander time       │  ← Quicksand, 13pt, reduced opacity
 │                                 │
 └─────────────────────────────────┘
 ```
@@ -163,10 +197,10 @@ let textTertiary = Color.white.opacity(0.4)
 ```
 
 ### Typography
-- Use SF Pro throughout (system font)
-- Destination name: SF Pro Display, Light or Ultralight, 17-20pt
-- Distance: SF Pro, Regular, 15pt
-- Secondary info: SF Pro, Light, 13pt
+- Use bundled Quicksand via `Theme.quicksand(size:weight:)`
+- Destination name: 17-20pt, medium/light depending on surface
+- Distance: large, quiet, glanceable
+- Secondary info: 13pt, reduced opacity
 
 ### Animations
 - All transitions: spring animation with response ~0.5s, dampingFraction ~0.8
@@ -182,33 +216,30 @@ Use `CHHapticEngine` for rich, custom haptics (not just `UIImpactFeedbackGenerat
 
 ### Haptic Patterns
 
-**On Track Pulse (every 5s when on track):**
-- Gentle, reassuring single tap
-- Intensity: 0.4, Sharpness: 0.3
+**In lane:**
+- Silent by default
+- Optional faint nod for calibration/testing profiles
 
-**Veer Warning (when going off course):**
-- Double tap, more noticeable
-- Intensity: 0.6, Sharpness: 0.5
-- Taps at 0s and 0.1s
+**Correct right:**
+- Short transient, gap, longer continuous pulse
 
-**Off Course Alert:**
-- Triple tap, urgent
-- Taps at 0, 0.08, 0.16 seconds
-- Intensity: 0.8, Sharpness: 0.7
+**Correct left:**
+- Longer continuous pulse, gap, short transient
 
-**Wrong Way Buzz:**
-- Continuous gentle vibration
-- Intensity: 0.5, Sharpness: 0.3
-- Duration: 0.5s
+**Strong correction:**
+- Repeat the directional signature twice
+
+**Wrong way:**
+- Long rumble, gap, directional signature
 
 **Arrival Celebration:**
-- Rising intensity taps: 0.3 → 0.5 → 0.7 → 1.0
+- Rising intensity taps: 0.3 -> 0.5 -> 0.7 -> 0.9
 - Final soft continuous buzz
 
 ### Haptic Timing
 - Don't spam haptics—they lose meaning
-- Minimum interval between haptic events: varies by zone
-- When user corrects course, pause haptics for 3s as "reward"
+- Minimum interval comes from `HapticPatternFactory`
+- Low-confidence states suppress directional haptics
 
 ---
 
@@ -227,7 +258,7 @@ NSLocationWhenInUseUsageDescription = "Bumper uses your location to guide you to
 - SwiftData
 - CoreLocation
 - CoreHaptics
-- MapKit (for search only)
+- MapKit (search and internal walking routes)
 
 ### No External Dependencies
 Pure Apple frameworks. No CocoaPods, SPM packages, or third-party libraries.
@@ -242,12 +273,13 @@ Pure Apple frameworks. No CocoaPods, SPM packages, or third-party libraries.
 
 ---
 
-## Definition of Done (v1)
+## Definition of Done (V2 Prototype)
 
 The app is ready for personal use when:
 
-1. **Core flow works:** Can set destination, navigate with haptics, arrive
-2. **Feels good:** Haptics are satisfying, not annoying; orb animation is smooth
-3. **Reliable:** Doesn't crash, location updates consistently
-4. **Minimal but complete:** No half-built features, everything present works fully
-5. **Actually used:** Tested with real walks in CDMX
+1. **Core flow works:** Can search, select looseness, calibrate, navigate, arrive
+2. **Pocket haptics work:** Strong correction is noticeable in a front pants pocket while walking
+3. **Direction is learnable:** Left vs right is clear within one calibration session
+4. **Corridor feels right:** A 15-minute city walk has rare false nudges and rising trust
+5. **Search and ETA feel native:** Nearby POIs, exact addresses, and rough fallback labels behave honestly
+6. **Platform gate is passed:** If pocket haptics fail, pivot to Apple Watch/wearable-first instead of polishing iPhone-only UX

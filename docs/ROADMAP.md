@@ -6,13 +6,14 @@
 
 ## v1.0 — Minimum Viable Bumper
 
-**Status:** In Progress
+**Status:** Complete
 
 Core features:
-- Hardcoded test destination
-- Haptic navigation (5 zones)
+- Destination search and recent places
+- Haptic navigation with simple guidance fallback
 - Temperature orb visualization
 - Arrival detection
+- Live Activity
 
 See `PLAN.md` for detailed progress.
 
@@ -20,39 +21,44 @@ See `PLAN.md` for detailed progress.
 
 ## v1.1 — Complete Flow
 
-**Status:** Planned (After v1.0)
+**Status:** Complete
 
-- [ ] Destination search (MapKit)
-- [ ] Recent destinations (SwiftData)
-- [ ] Wander dial (time constraint)
-- [ ] Full arrival screen
+- [x] Destination search (MapKit)
+- [x] Recent destinations (SwiftData)
+- [x] Wander dial (time constraint)
+- [x] Full arrival screen
 
 ---
 
 ## v1.2 — Polish & Refinement
 
-**Status:** Ideas
+**Status:** Mostly Complete, Device Testing Pending
 
-- [ ] Refined haptic patterns based on walk-testing
-- [ ] Accessibility improvements (VoiceOver, Dynamic Type)
-- [ ] Battery optimization
-- [ ] Heading calibration prompts
+- [x] Pocket-first haptic pattern redesign
+- [x] Accessibility improvements for active navigation
+- [x] Battery optimization
+- [x] Heading calibration prompts
+- [ ] Device walk-test tuning
 
 ---
 
 ## v2.0 — Route Awareness
 
-**Status:** Exploratory
+**Status:** Prototype Implemented, Validation Pending
 
 The pure crow-flies approach is philosophically correct but may frustrate users in complex urban environments.
 
-### Possible Approaches
+### Implemented Approach
 
-**Option A: Corridor Mode**
+**Corridor Mode**
 - Use MapKit walking directions to create a "path band"
 - User can wander within the band
 - Haptics only fire when leaving the corridor
 - Preserves exploration while avoiding dead-ends
+
+The route stays internal. The app shows a quiet navigation instrument, never a blue line.
+
+### Still Exploratory
 
 **Option B: Obstacle Hints**
 - Detect when user is heading toward water, highways, or restricted areas
@@ -72,7 +78,7 @@ The pure crow-flies approach is philosophically correct but may frustrate users 
 | Obstacle Hints | Yes | High | Higher |
 | Learning | Somewhat | High | Medium |
 
-**Current thinking:** v1 proves the concept. v2 adds intelligence only if users request it.
+**Current thinking:** V2 only continues if real walks prove the corridor feels calmer and more trustworthy than the crow-flies prototype.
 
 ---
 
@@ -167,7 +173,8 @@ Known issues to address eventually:
 - [ ] Haptic engine restart is aggressive
 - [ ] No graceful degradation for iOS < 17
 - [ ] Debug overlay is crude
-- [ ] No unit tests
+- [x] Unit tests for navigation math, corridor projection, haptics, search stale-result suppression, and ETA labels
+- [ ] Full Xcode test run pending installed simulator/runtime
 
 ---
 

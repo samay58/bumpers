@@ -2,7 +2,7 @@
 //  BumpersApp.swift
 //  bumpers
 //
-//  Hot/cold navigation app — guides you with haptics, not routes.
+//  Route-aware walking app — guides wandering with haptics, not turn-by-turn.
 //
 
 import SwiftUI
@@ -10,6 +10,7 @@ import SwiftData
 
 @main
 struct BumpersApp: App {
+    @State private var locationService = LocationService()
 
     // MARK: - SwiftData Container
 
@@ -33,7 +34,7 @@ struct BumpersApp: App {
 
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            HomeView(locationService: locationService)
         }
         .modelContainer(sharedModelContainer)
     }

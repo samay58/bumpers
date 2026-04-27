@@ -20,9 +20,9 @@
 
 ## Pre-Flight
 
-**Status:** Ready for field testing.
+**Status:** Historical V1 field guide.
 
-All systems go. The app is built, the critical bugs are squashed, and 180º Shop awaits.
+This guide documents the original crow-flies hot/cold prototype. The current V2 route-aware walk protocol lives in [`docs/WALK-TESTS.md`](WALK-TESTS.md). Use that file for current simulator, pocket haptic, corridor, search, and ETA validation.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -108,10 +108,10 @@ You walk. The app feels.
         │                                                         │
         └─────────────────────────────────────────────────────────┘
 
-                    deviation = your_heading - bearing
+                    deviation = bearing - your_heading
 
-                           Negative = turn left
-                           Positive = turn right
+                           Negative = correct left
+                           Positive = correct right
                            Zero = perfect
 ```
 

@@ -1,6 +1,6 @@
 # Bumper — Implementation Plan
 
-*Last updated: 2026-01-02*
+*Last updated: 2026-04-27*
 
 ---
 
@@ -8,8 +8,8 @@
 
 This document tracks implementation progress. Check boxes indicate completion.
 
-**Current Phase:** Phase 5 (Final Polish)
-**Overall Progress:** Phase 1-4 complete, Phase 5 in progress
+**Current Phase:** Phase 6 (Route-Aware V2 validation)
+**Overall Progress:** Phase 1-5 complete, Phase 6 implementation complete; simulator and device validation pending
 
 ---
 
@@ -41,12 +41,9 @@ This document tracks implementation progress. Check boxes indicate completion.
   - [x] Core Haptics engine setup
   - [x] Engine lifecycle (restart on foreground)
   - [x] Fallback to UIImpactFeedbackGenerator
-  - [x] `playOnTrackPulse()` — Single tap
-  - [x] `playVeerWarning()` — Double tap
-  - [x] `playOffCourseAlert()` — Triple tap
-  - [x] `playWrongWayBuzz()` — Continuous buzz
-  - [x] `playArrival()` — Celebration pattern
-  - [x] `playForZone(_:)` — Zone-based dispatch
+  - [x] Pattern playback from `HapticPatternFactory`
+  - [x] Profile-aware playback (`pocketMax`, `pocketNormal`, `handheld`, `quiet`)
+  - [x] Arrival pattern playback
 
 ### Models Layer
 
@@ -272,6 +269,63 @@ This document tracks implementation progress. Check boxes indicate completion.
 
 ---
 
+## Phase 6: Route-Aware V2 ⏳ IN PROGRESS
+
+**Goal:** Prove the real product: wander toward a place without following a route.
+
+### Core Pivot
+
+- [x] Fix left/right sign convention so positive deviation means correct right
+- [x] Keep crow-flies guidance as fallback only
+- [x] Add user-facing looseness modes: Direct, Room to wander, Scenic
+- [x] Use MapKit walking routes internally without showing a blue route line
+- [x] Add route-aware corridor projection and progress tracking
+- [x] Add low-confidence states that suppress directional haptics
+- [x] Add wrong-way detection from sustained bad progress
+- [x] Add reroute cooldown instead of constant rerouting
+
+### Search and ETA
+
+- [x] Refactor search into `DestinationSearchService` and `DestinationSearchViewModel`
+- [x] Debounce query input and suppress stale results
+- [x] Use current location as MapKit search region when available
+- [x] Cancel prior MapKit searches before starting new ones
+- [x] Render MapKit suggestions and resolve tapped suggestions through the search view model
+- [x] Store iOS 18+ `MKMapItem.Identifier` raw value when available
+- [x] Replace fake 15-minute estimate with explicit finding/estimating/direct/rough/unavailable states
+- [x] Use MapKit walking ETA first, straight-line ETA only as labeled rough fallback
+
+### Pocket-First Haptics
+
+- [x] Add `HapticProfile` with pocketMax, pocketNormal, handheld, quiet
+- [x] Add inspectable `HapticPatternFactory`
+- [x] Replace intensity-ramp direction language with duration rhythm
+- [x] Add skippable first-run haptic calibration
+- [x] Remove double arrival haptic playback
+- [x] Keep on-track mostly silent
+
+### Visual Refresh
+
+- [x] Calm the active navigation glow
+- [x] Show mode and simple-guidance fallback
+- [x] Preserve debug triple tap with confidence and route mode
+- [x] Update README/agent/docs language from crow-flies V1 to route-aware V2
+- [x] Add V2 walk-test protocol in `docs/WALK-TESTS.md`
+- [x] Install updated app icon into `Assets.xcassets`
+- [x] Add README cover image
+- [ ] Device walk-test the new corridor and pocket haptics
+
+### Verification
+
+- [x] Add unit tests for sign convention, route projection, corridor states, stale search suppression, ETA labels, and haptic pattern shape
+- [x] Direct Swift typecheck passes for app Swift files
+- [x] Fold simulator-install dependency into validation plan
+- [ ] Xcode build passes after local iOS simulator/runtime install finishes
+- [ ] Unit tests pass on concrete simulator
+- [ ] Real-device walk tests pass the V2 gate
+
+---
+
 ## Files Checklist
 
 | File | Status | Phase |
@@ -281,14 +335,28 @@ This document tracks implementation progress. Check boxes indicate completion.
 | `NavigationCalculator.swift` | ✅ Done | 1 |
 | `LocationService.swift` | ✅ Done | 1 |
 | `HapticService.swift` | ✅ Done | 1 |
+| `RouteService.swift` | ✅ Implemented | 6 |
+| `CorridorNavigationEngine.swift` | ✅ Implemented | 6 |
+| `DestinationSearchService.swift` | ✅ Implemented | 6 |
+| `HapticPatternFactory.swift` | ✅ Implemented | 6 |
+| `HapticCalibrationService.swift` | ✅ Implemented | 6 |
 | `TemperatureZone.swift` | ✅ Done | 1 |
 | `Destination.swift` | ✅ Done | 1 |
+| `NavigationMode.swift` | ✅ Implemented | 6 |
+| `WalkingRoute.swift` | ✅ Implemented | 6 |
+| `CorridorState.swift` | ✅ Implemented | 6 |
+| `HapticProfile.swift` | ✅ Implemented | 6 |
+| `SearchModels.swift` | ✅ Implemented | 6 |
 | `NavigationViewModel.swift` | ✅ Done | 1 |
 | `NavigationView.swift` | ✅ Done | 1 |
 | `OrbView.swift` | ✅ Done | 2 |
 | `Animations.swift` | ✅ Done | 2 |
 | `HomeView.swift` | ✅ Done | 3 |
 | `WanderDialSheet.swift` | ✅ Done | 3 |
+| `DestinationSearchViewModel.swift` | ✅ Implemented | 6 |
+| `HapticCalibrationView.swift` | ✅ Implemented | 6 |
+| `NavigationModePicker.swift` | ✅ Implemented | 6 |
+| `DestinationRows.swift` | ✅ Implemented | 6 |
 | `ArrivalView.swift` | ✅ Done | 4 |
 | `PermissionView.swift` | ✅ Done | 4 |
 | `LaunchScreen.storyboard` | ✅ Done | 5 |

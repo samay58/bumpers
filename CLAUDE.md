@@ -2,7 +2,7 @@
 
 ## Project
 
-Bumper is a "hot or cold" iOS navigation app. Instead of turn-by-turn directions, it uses haptic feedback and a gradient orb to guide users toward their destination. Pick a place, pocket the phone, and haptic pulses tell you if you're getting warmer or colder. The name comes from bowling bumpers: you can bounce around, but you'll still get there.
+Bumper is an iOS walking app for wandering toward a place without staring at a route. It uses MapKit walking routes internally to create a loose corridor, then gives haptic correction only when the user drifts meaningfully away or starts making bad progress. The route is never exposed as turn-by-turn navigation.
 
 - **iOS 17+**, SwiftUI-first, no external dependencies (pure Apple frameworks)
 - **Bundle ID:** `samayd.bumpers`
@@ -42,42 +42,67 @@ Don't skip layers. Views talk to ViewModels, not directly to Services.
 **Services layer** — stateless calculators and system wrappers:
 - `NavigationCalculator` — Haversine bearing, deviation, distance, arrival detection (50m radius), wander budget. All static methods.
 - `LocationService` — `@Observable` CLLocationManager wrapper. Three update modes (precise/balanced/efficient) for battery optimization. Heading falls back from compass to GPS course.
-- `HapticService` — Core Haptics engine with zone-based patterns and UIImpactFeedbackGenerator fallback.
+- `RouteService` — MapKit walking directions wrapper. Requests alternate walking routes and returns route geometry plus ETA/distance metadata.
+- `RouteCorridor` / `CorridorNavigationEngine` — Projects the user onto the route corridor, tracks progress, classifies confidence and drift, and emits `CorrectionInstruction`.
+- `DestinationSearchService` — Location-aware MapKit search/completer service with stale-result suppression through `DestinationSearchViewModel`.
+- `HapticPatternFactory` / `HapticService` — Pocket-first duration-rhythm haptic patterns with Core Haptics playback and UIKit fallback.
 - `LiveActivityManager` — ActivityKit lifecycle for Lock Screen + Dynamic Island. Local updates only (no push).
 
-**Navigation flow:** `HomeView` (search) -> `WanderDialSheet` (time constraint) -> `NavigationView` (core experience) -> `ArrivalView` (celebration)
+**Navigation flow:** `HomeView` (search) -> `WanderDialSheet` (time + looseness + calibration) -> `NavigationView` (corridor guidance) -> `ArrivalView` (stats)
 
-**The brain:** `NavigationViewModel` ties everything together. It owns the 0.5s timer that drives the update loop: track distance, sample journey points, update Live Activity, optimize location mode, check arrival, fire haptics. The "reward pause" (3s haptic silence after course correction) is intentional UX.
+**The brain:** `NavigationViewModel` orchestrates services only. It owns the 0.5s loop, route loading/rerouting, journey sampling, Live Activity updates, location-mode tuning, arrival transition, and haptic cooldown. Corridor decisions live in `CorridorNavigationEngine`, not in the view model.
 
-**Design system:** `Theme.swift` is the single source for colors, typography (all Quicksand via `Theme.quicksand(size:weight:)`), spacing tokens, animation presets, and orb visual constants. `TemperatureZone` owns its own colors, haptic intervals, pulse scales, and spring configs. `Interactions.swift` provides `.pressable()`, `.rowPressable()`, and `.staggeredEntrance()` modifiers.
+**Design system:** `Theme.swift` is the single source for colors, typography (all Quicksand via `Theme.quicksand(size:weight:)`), spacing tokens, animation presets, and orb visual constants. `TemperatureZone` owns visual temperature colors and animation tuning. Haptic timing lives in `HapticPatternFactory`. `Interactions.swift` provides `.pressable()`, `.rowPressable()`, and `.staggeredEntrance()` modifiers.
 
 **Shared code between targets:** `NavigationActivityAttributes` lives in `bumpers/Shared/` and is added to both the main app and widget extension targets. Zone is passed as a raw string to stay Codable.
 
-## Navigation Math
+## Navigation Logic
 
 ```
-bearing = haversine(current, destination)     // 0-360 degrees
-deviation = normalize(heading - bearing)       // -180 to +180
-zone = TemperatureZone.from(abs(deviation))   // hot/warm/cool/cold/freezing
+route = MapKit walking route(s)
+corridor = route geometry + NavigationMode width
+projection = nearest route point + route progress
+instruction = corridor distance + progress trend + confidence + heading/course
 ```
 
-Positive deviation = turn right. Negative = turn left. This is crow-flies bearing by design (no route following).
+Primary mode is route-aware corridor guidance. Crow-flies bearing is fallback only when MapKit route lookup fails or confidence is too poor for corridor guidance.
 
-| Zone | Deviation | Haptic Interval | Pattern |
-|------|-----------|-----------------|---------|
-| Hot | 0-20 | 5s | Single gentle tap |
-| Warm | 20-45 | 3s | Double tap |
-| Cool | 45-90 | 2s | Triple tap |
-| Cold | 90-135 | 1.5s | Triple tap (urgent) |
-| Freezing | 135-180 | 0.5s | Continuous buzz |
+The sign convention is:
+
+```
+deviation = normalize(targetBearing - currentHeading)
+positive deviation = correct right
+negative deviation = correct left
+```
+
+`CorrectionDirection.from(deviation:)` is the source of truth for sign mapping.
+
+| Mode | Label | Baseline Corridor |
+|------|-------|-------------------|
+| `direct` | Keep me close | 35m |
+| `roomToWander` | Give me space | 75m |
+| `scenic` | Let me drift | 125m |
+
+Confidence rules:
+- Horizontal accuracy worse than 50m suppresses directional haptics.
+- If heading is unavailable and walking speed is below 0.7 m/s, wait for course instead of guessing.
+- Arrival requires staying inside the dynamic arrival radius for 3 seconds.
+
+Haptic language:
+- On track is silent by default.
+- Correct right: short pulse, gap, long pulse.
+- Correct left: long pulse, gap, short pulse.
+- Strong corrections repeat the signature.
+- Wrong way is long rumble plus directional signature.
 
 ## Key Design Decisions
 
 | Decision | Rationale |
 |----------|-----------|
 | Foreground-only (no background mode) | Haptics require foreground. Screen stays on via `isIdleTimerDisabled`. |
-| Crow-flies bearing, no routing | Core philosophy: user navigates obstacles, builds spatial awareness. |
-| 5 temperature zones | Simple mental model maps cleanly to haptic patterns. |
+| Route-aware soft corridor | Preserves wandering while avoiding stupid crow-flies nudges through buildings and street-grid constraints. |
+| Crow-flies fallback | Honest degradation when MapKit routing fails. UI shows "Using simple direction guidance." |
+| Pocket-first haptics | Duration rhythm survives clothing better than subtle intensity ramps. |
 | `@Observable` not `ObservableObject` | iOS 17+ only. Use `@State` to hold `@Observable` objects in views. |
 | SwiftData for recent destinations | Simple structured persistence, ships with SwiftUI. |
 | Live Activity uses raw strings for zone | `ContentState` must be `Codable`; avoids cross-target enum coupling. |
@@ -98,6 +123,8 @@ Positive deviation = turn right. Negative = turn left. This is crow-flies bearin
 - View `body` max 100 lines. Extract subviews to avoid type-checker timeouts.
 - No force-unwraps (`!`) in production code.
 - `@MainActor` on ViewModels and any type driving UI state.
+- Prefer item-driven sheets (`.sheet(item:)`) when a selected model drives presentation.
+- Cancel stale async tasks before starting replacement MapKit searches or route estimates.
 - Use Swift Testing (`#expect`, `#require`) for new tests.
 
 ## Simulator Limitations
@@ -106,7 +133,7 @@ Positive deviation = turn right. Negative = turn left. This is crow-flies bearin
 - Compass heading doesn't work — use GPS course (requires simulated movement) or mock
 - Location can be simulated via Xcode: Features -> Location -> Custom Location
 
-**Debug overlay:** Triple-tap on the navigation screen to show lat/lon, heading, bearing, deviation, zone, distance.
+**Debug overlay:** Triple-tap on the navigation screen to show lat/lon, heading, bearing, deviation, zone, distance, corridor/simple mode, confidence, and navigation mode.
 
 ## Documentation
 

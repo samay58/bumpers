@@ -10,11 +10,17 @@ import CoreLocation
 
 struct WanderDialSheet: View {
     let destination: Destination
+    let locationService: LocationService
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("hapticProfile") private var hapticProfileRawValue = HapticProfile.pocketNormal.rawValue
+    @AppStorage("hasSeenHapticCalibration") private var hasSeenHapticCalibration = false
     @State private var wanderMinutes: Double = 60 // Start at "no rush" position
     @State private var showNavigation = false
-    @State private var estimatedWalkTime: TimeInterval = 0
+    @State private var walkEstimate: WalkEstimateState = .findingLocation
+    @State private var selectedMode: NavigationMode = .roomToWander
+    @State private var showCalibration = false
+    @State private var estimateTask: Task<Void, Never>?
 
     // For haptic tick feedback on slider
     @State private var lastTickValue: Int = 12 // 60/5 = 12 ticks
@@ -22,7 +28,7 @@ struct WanderDialSheet: View {
     // Hero transition state
     @State private var isTransitioning = false
 
-    private let locationService = LocationService()
+    private let routeService = RouteService()
 
     // Slider range: 0 = leave now, 60+ = no rush
     private let maxMinutes: Double = 60
@@ -46,6 +52,11 @@ struct WanderDialSheet: View {
                         .padding(.bottom, 40)
                         .opacity(isTransitioning ? 0 : 1)
 
+                    NavigationModePicker(selectedMode: $selectedMode)
+                        .padding(.horizontal, Theme.Spacing.xxl)
+                        .padding(.bottom, Theme.Spacing.xl)
+                        .opacity(isTransitioning ? 0 : 1)
+
                     wanderDial
                         .padding(.horizontal, Theme.Spacing.xxl)
                         .padding(.bottom, Theme.Spacing.xxxl)
@@ -67,7 +78,27 @@ struct WanderDialSheet: View {
             }
             .onAppear {
                 locationService.requestPermission()
+                locationService.startUpdating()
                 updateWalkTimeEstimate()
+                showCalibration = !hasSeenHapticCalibration
+            }
+            .onChange(of: locationService.currentLocation) { _, _ in
+                updateWalkTimeEstimate()
+            }
+            .sheet(isPresented: $showCalibration) {
+                HapticCalibrationView(
+                    hapticProfile: hapticProfile,
+                    hapticService: HapticService(),
+                    onComplete: { profile in
+                        hapticProfileRawValue = profile.rawValue
+                        hasSeenHapticCalibration = true
+                        showCalibration = false
+                    },
+                    onSkip: {
+                        hasSeenHapticCalibration = true
+                        showCalibration = false
+                    }
+                )
             }
         }
         .presentationDetents([.medium, .large])
@@ -102,7 +133,7 @@ struct WanderDialSheet: View {
                 .textCase(.uppercase)
                 .tracking(0.5)
 
-            Text(formatWalkTime(estimatedWalkTime))
+            Text(walkEstimate.displayText)
                 .font(Theme.headlineFont)
                 .foregroundStyle(Theme.textSecondary)
         }
@@ -231,7 +262,8 @@ struct WanderDialSheet: View {
             .frame(height: 52)
         }
         .pressable()
-        .disabled(isTransitioning)
+        .disabled(isTransitioning || !canStart)
+        .opacity(canStart ? 1 : 0.45)
     }
 
     private func startNavigation() {
@@ -272,8 +304,17 @@ struct WanderDialSheet: View {
 
     private var arrivalTime: Date? {
         guard !isNoRush else { return nil }
-        let totalSeconds = estimatedWalkTime + (wanderMinutes * 60)
+        guard let estimateSeconds = walkEstimate.seconds else { return nil }
+        let totalSeconds = estimateSeconds + (wanderMinutes * 60)
         return Date().addingTimeInterval(totalSeconds)
+    }
+
+    private var hapticProfile: HapticProfile {
+        HapticProfile(rawValue: hapticProfileRawValue) ?? .pocketNormal
+    }
+
+    private var canStart: Bool {
+        isNoRush || walkEstimate.seconds != nil
     }
 
     // MARK: - Slider Helpers
@@ -310,33 +351,43 @@ struct WanderDialSheet: View {
 
     private func updateWalkTimeEstimate() {
         guard let location = locationService.currentLocation else {
-            // Fallback estimate if no location yet
-            estimatedWalkTime = 15 * 60 // 15 minutes default
+            estimateTask?.cancel()
+            walkEstimate = locationService.isAuthorized ? .estimating : .findingLocation
             return
         }
 
-        let distance = NavigationCalculator.distance(
-            from: location.coordinate,
-            to: destination.coordinate
-        )
-        estimatedWalkTime = NavigationCalculator.estimatedWalkingTime(meters: distance)
-    }
-
-    private func formatWalkTime(_ seconds: TimeInterval) -> String {
-        let minutes = Int(seconds / 60)
-        if minutes < 1 {
-            return "< 1 min"
-        } else if minutes == 1 {
-            return "~1 min"
-        } else {
-            return "~\(minutes) min"
+        walkEstimate = .estimating
+        estimateTask?.cancel()
+        estimateTask = Task {
+            do {
+                let routes = try await routeService.walkingRoutes(from: location.coordinate, to: destination.coordinate)
+                if let fastest = routes.min(by: { $0.expectedTravelTime < $1.expectedTravelTime }) {
+                    await MainActor.run {
+                        guard !Task.isCancelled else { return }
+                        walkEstimate = .directRoute(fastest.expectedTravelTime)
+                    }
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                let distance = NavigationCalculator.distance(
+                    from: location.coordinate,
+                    to: destination.coordinate
+                )
+                await MainActor.run {
+                    guard !Task.isCancelled else { return }
+                    walkEstimate = .roughStraightLine(NavigationCalculator.estimatedWalkingTime(meters: distance))
+                }
+            }
         }
     }
 
     private func createViewModel() -> NavigationViewModel {
         NavigationViewModel(
             destination: destination,
-            arrivalTime: arrivalTime
+            arrivalTime: arrivalTime,
+            mode: selectedMode,
+            locationService: locationService,
+            hapticProfile: hapticProfile
         )
     }
 }
@@ -370,5 +421,5 @@ extension Color {
 // MARK: - Preview
 
 #Preview {
-    WanderDialSheet(destination: .testDestination)
+    WanderDialSheet(destination: .testDestination, locationService: LocationService())
 }

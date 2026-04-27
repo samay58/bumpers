@@ -19,14 +19,22 @@ final class Destination {
     var latitude: Double
     var longitude: Double
     var lastUsed: Date
+    var mapItemIdentifierRawValue: String?
 
     // MARK: - Initialization
 
-    init(name: String, address: String, latitude: Double, longitude: Double) {
+    init(
+        name: String,
+        address: String,
+        latitude: Double,
+        longitude: Double,
+        mapItemIdentifierRawValue: String? = nil
+    ) {
         self.name = name
         self.address = address
         self.latitude = latitude
         self.longitude = longitude
+        self.mapItemIdentifierRawValue = mapItemIdentifierRawValue
         self.lastUsed = Date()
     }
 

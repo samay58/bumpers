@@ -16,9 +16,6 @@ struct ArrivalView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var appeared = false
 
-    // Haptic service for arrival celebration
-    private let hapticService = HapticService()
-
     // Staggered entrance delays (hand-crafted uneven timing)
     private let orbDelay: Double = 0.1
     private let titleDelay: Double = 0.3
@@ -85,12 +82,6 @@ struct ArrivalView: View {
         .statusBarHidden(true)
         .onAppear {
             appeared = true
-
-            // Play celebratory haptic crescendo
-            hapticService.prepare()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                hapticService.playArrival()
-            }
         }
     }
 

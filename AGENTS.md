@@ -6,9 +6,9 @@ This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get sta
 
 ## Project Context
 
-**Bumper** is an iOS navigation app that uses haptic feedback instead of turn-by-turn directions. The core philosophy is building spatial awareness through "hot or cold" guidance.
+**Bumper** is an iOS navigation app that uses haptic feedback instead of turn-by-turn directions. The core philosophy is helping a user wander toward a destination without staring at a route.
 
-**Current Status:** Phase 1 complete (Minimum Viable Navigation). See `docs/PLAN.md` for details.
+**Current Status:** Phase 6 Route-Aware V2 prototype is implemented and awaiting simulator/device validation. See `docs/PLAN.md` for details.
 
 ---
 

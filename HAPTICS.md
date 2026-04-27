@@ -1,7 +1,43 @@
 # HAPTICS.md — Bumper Haptic Language
 
 > This file defines the haptic vocabulary for Bumper. Claude Code reads it automatically.
-> All haptic implementation goes through `Services/HapticService.swift` using Core Haptics.
+> Haptic vocabulary starts in `Services/HapticPatternFactory.swift`; `Services/HapticService.swift` only plays those descriptors through Core Haptics or UIKit fallback.
+
+---
+
+## Current V2 Pocket Language
+
+V2 is pocket-first. The source of truth in code is `HapticPatternFactory`, which emits inspectable pattern descriptors before `HapticService` converts them to Core Haptics events.
+
+The direction language is duration-rhythm based:
+
+| State | Meaning | Pattern |
+|-------|---------|---------|
+| In lane | You are fine | Silence by default |
+| Correct right | Move right soon | Short pulse, gap, long pulse |
+| Correct left | Move left soon | Long pulse, gap, short pulse |
+| Strong correction | Correct now | Repeat the directional signature twice |
+| Wrong way | Turn around | Long rumble, gap, directional signature |
+| Arrival | You are here | Crescendo, then warm tail |
+
+Profiles:
+
+| Profile | Use |
+|---------|-----|
+| `pocketMax` | Front-pocket walk tests where haptics are weak |
+| `pocketNormal` | Default first-run profile |
+| `handheld` | Lower energy for in-hand use |
+| `quiet` | Minimal feedback |
+
+The sign convention is shared across navigation, accessibility, and haptics:
+
+```
+deviation = normalize(targetBearing - currentHeading)
+positive deviation = correct right
+negative deviation = correct left
+```
+
+Older intensity-ramp zone notes below are historical reference only. Do not reintroduce rising/falling transient intensity as the primary V2 direction language.
 
 ---
 
@@ -9,19 +45,19 @@
 
 Bumper's haptics are a **language the user's body learns over time.** Three principles:
 
-1. **On-track feels rewarding.** A slow, warm, satisfying click — like a watch crown settling into place. This is the "you're doing great" signal. It should feel good enough that the user subtly seeks it out.
+1. **Silence means success.** In-lane walking should usually produce nothing. Optional nods are for calibration and testing, not the default walk loop.
 
-2. **Off-track encodes direction.** Left and right deviation produce distinct haptic patterns so the user learns to correct without looking at the screen. The encoding is temporal: a **rising** sequence (soft → firm) means one direction; a **falling** sequence (firm → soft) means the other.
+2. **Off-track encodes direction.** Left and right correction produce distinct haptic patterns so the user learns to correct without looking at the screen. The V2 encoding is temporal duration: short-long means correct right, long-short means correct left.
 
 3. **Intensity scales with urgency, not annoyance.** Further off-track means stronger and more frequent, but never a crude continuous buzz. Even the most urgent signal is a patterned rhythm — uncomfortable enough to correct, never unpleasant enough to make the user turn off haptics.
 
 ---
 
-## The Direction Encoding
+## Historical V1 Direction Encoding
 
-This is the core innovation. Direction is encoded in **tap sequence order**, not sharpness or pitch.
+This section describes the older intensity-ramp language. It is kept for comparison, not as the current implementation target.
 
-### Rising Pattern → "Correct Right" (user has veered left, deviation < 0)
+### Rising Pattern → "Correct Right" (historical)
 
 ```
 tap₁ (soft) → gap → tap₂ (firm)
@@ -30,7 +66,7 @@ tap₁ (soft) → gap → tap₂ (firm)
 The second tap is stronger than the first. Feels like momentum building rightward.
 Perceptually: a "nudge" that lands on the strong beat at the end.
 
-### Falling Pattern → "Correct Left" (user has veered right, deviation > 0)
+### Falling Pattern → "Correct Left" (historical)
 
 ```
 tap₁ (firm) → gap → tap₂ (soft)
@@ -48,9 +84,9 @@ Perceptually: a "nudge" that leads with the strong beat.
 
 ---
 
-## Zone × Direction Matrix
+## Historical V1 Zone × Direction Matrix
 
-The full haptic space. Each cell describes what the user feels.
+This section is old V1 design context. It is not the V2 implementation target.
 
 ### Hot Zone (0°–20° deviation) — On Track
 
@@ -214,15 +250,15 @@ events: [
 
 ---
 
-## Transition Smoothing
+## V2 Transition Smoothing
 
-When the user crosses a zone boundary, don't abruptly switch patterns. Instead:
+V2 smoothing happens at the corridor-state layer, not by directly debouncing angular zones.
 
-1. **Debounce zone changes** by 1.5 seconds. If the user bounces between zones (e.g., walking along the edge of Hot ↔ Warm), don't ping-pong the haptics. Stay in the current zone until the new zone has been stable for 1.5s.
+1. **Suppress low-confidence direction.** If GPS accuracy or heading/course is poor, emit only neutral low-confidence feedback.
 
-2. **Blend at boundaries.** When transitioning from Hot → Warm, the first Warm pattern should play at 75% of its normal intensity. Second play is at full. This prevents a jarring jump from the gentle "nod" to the directional nudge.
+2. **Use haptic cooldowns.** `HapticPatternFactory` defines per-pattern cooldowns so corrections do not become a constant buzz.
 
-3. **Direction hysteresis.** If deviation crosses 0° (Hot zone, switching from barely-left to barely-right), don't change the direction encoding. Only encode direction once outside the Hot zone. The Hot zone is always direction-agnostic — it's always the same rewarding click regardless of which side of center you are.
+3. **Let silence carry in-lane state.** Do not play repeated on-track pulses during normal navigation.
 
 ---
 
@@ -235,63 +271,26 @@ When I test on device and ask for changes, use these mappings:
 | "too buzzy" / "feels cheap" | Increase sharpness by 0.10–0.15 (crisper transients feel more premium) |
 | "too aggressive" / "too strong" | Decrease intensity by 0.10–0.15 |
 | "can barely feel it" / "too subtle" | Increase intensity by 0.10–0.15 |
-| "can't tell left from right" | Widen the intensity gap between the soft and firm taps in the rising/falling pattern |
+| "can't tell left from right" | Widen the duration gap or replay spacing between the short-long and long-short signatures |
 | "too frequent" / "nagging" | Increase the interval by 0.5–1.0 seconds |
 | "not urgent enough" | Decrease the interval, or add one more tap to the pattern |
-| "the on-track click is too sharp" | Decrease sharpness toward 0.40 (warmer) |
-| "the on-track click isn't satisfying enough" | Increase intensity slightly (+0.05) and/or increase the continuous tail duration |
-| "the transition between zones is jarring" | Increase debounce time or add a third intermediate-intensity play |
-| "I keep overshooting the correction" | The directional signal may be too intense — soften the Warm zone pattern |
+| "I miss reassurance when in lane" | Consider an optional, rare `onTrackNod`; keep default navigation silent |
+| "the transition between zones is jarring" | Increase engine state stability requirements or haptic cooldown |
+| "I keep overshooting the correction" | The directional signal may be too frequent or too strong for gentle drift |
 | "feels robotic" | Add ±0.03 randomization to intensity values per-play |
 
 ---
 
 ## Implementation Notes for Claude Code
 
-### Updating HapticService.swift
+### Current V2 Implementation
 
-The existing `HapticService.swift` needs to be refactored to support this system. Key changes:
+- `HapticPatternFactory` owns haptic vocabulary and returns `HapticPattern` descriptors.
+- `HapticService` only prepares the engine, converts descriptors to `CHHapticEvent`, and falls back to UIKit generators.
+- `NavigationViewModel` applies cooldowns from `HapticPatternFactory` before playback.
+- `ArrivalView` does not play its own haptic. Arrival playback is owned by `NavigationViewModel`.
 
-1. **Add direction as an input.** Every zone-based haptic method (except Hot) takes a `CorrectionDirection` parameter:
-   ```swift
-   enum CorrectionDirection {
-       case left   // user should correct left (deviation > 0)
-       case right  // user should correct right (deviation < 0)
-   }
-   ```
-
-2. **Replace the current zone patterns** (single/double/triple tap + continuous buzz) with the directional patterns specified above.
-
-3. **Add the "Nod" pattern** for the Hot zone (transient + continuous tail).
-
-4. **Add the arrival crescendo** as a distinct method.
-
-5. **Add zone transition debouncing** in `NavigationViewModel.swift`, not in `HapticService.swift`. The service plays what it's told; the view model decides when to change zones.
-
-6. **Use Core Haptics for all patterns**, not UIKit generators. The directional asymmetry requires per-tap intensity control that UIKit generators can't provide. Keep UIKit generators only as a device-capability fallback.
-
-### Updating NavigationViewModel.swift
-
-1. Pass `CorrectionDirection` derived from the sign of `deviation` to the haptic service.
-2. Implement the 1.5s zone debounce.
-3. Implement the boundary intensity blending (first play in a new zone at 75%).
-4. Hot zone is always direction-agnostic — ignore deviation sign when in Hot.
-
-### Updating TemperatureZone.swift
-
-The haptic intervals may differ from current values. Use these:
-
-```swift
-var hapticInterval: TimeInterval {
-    switch self {
-    case .hot: return 5.0
-    case .warm: return 3.5
-    case .cool: return 2.0
-    case .cold: return 1.2
-    case .freezing: return 0.7
-    }
-}
-```
+Do not add new haptic behavior directly to `HapticService`; add it to `HapticPatternFactory` first and cover it with tests.
 
 ---
 
@@ -299,14 +298,14 @@ var hapticInterval: TimeInterval {
 
 Test each scenario on a real walk:
 
-1. **On-track feel.** Walk straight toward destination. Does the "nod" feel satisfying? Is 5s the right interval — reassuring without nagging?
+1. **In-lane silence.** Walk a plausible route. Does silence feel like success, or does it create uncertainty?
 
-2. **Direction legibility.** Walk at ~45° off-course to the left, then to the right. Can you tell the difference between rising and falling patterns without looking at the screen? How many repetitions until it becomes automatic?
+2. **Direction legibility.** Walk at ~45° off-course to the left, then to the right. Can you tell the difference between short-long and long-short patterns without looking at the screen? How many repetitions until it becomes automatic?
 
-3. **Zone transitions.** Slowly sweep from on-track to 90° off. Does the escalation feel smooth? Are zone boundaries jarring?
+3. **Corridor transitions.** Move from in-lane to drift to off-course. Does escalation feel smooth? Are state changes jarring?
 
-4. **Freezing urgency.** Walk directly away from destination. Does the pattern feel urgent without being unpleasant? Can you still tell which direction to correct?
+4. **Wrong-way urgency.** Walk directly away from destination. Does the rumble plus directional signature feel urgent without being unpleasant? Can you still tell which direction to correct?
 
 5. **Arrival payoff.** Walk to the destination and arrive. Does the crescendo feel like a reward? Does it feel like an ending?
 
-Report findings using the adjustment vocabulary above (e.g., "the Warm nudge is too subtle, the Cold triple feels robotic").
+Report findings using the adjustment vocabulary above (for example, "pocketMax right correction is clear, left correction blurs in loose pants").

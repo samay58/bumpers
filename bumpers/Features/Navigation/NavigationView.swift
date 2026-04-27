@@ -114,8 +114,8 @@ struct NavigationView: View {
         GeometryReader { geo in
             RadialGradient(
                 colors: [
-                    viewModel.zone.colors.inner.opacity(glowIntensity * 0.35),
-                    viewModel.zone.colors.outer.opacity(glowIntensity * 0.12),
+                    viewModel.zone.colors.inner.opacity(glowIntensity * 0.20),
+                    viewModel.zone.colors.outer.opacity(glowIntensity * 0.07),
                     .clear
                 ],
                 center: .center,
@@ -133,20 +133,20 @@ struct NavigationView: View {
         ZStack {
             // Outer halo — large, very soft
             Circle()
-                .fill(viewModel.zone.colors.inner.opacity(0.12))
-                .scaleEffect(glowScale * 2.8)
+                .fill(viewModel.zone.colors.inner.opacity(0.08))
+                .scaleEffect(glowScale * 2.2)
                 .blur(radius: 120)
 
             // Middle glow — medium diffusion
             Circle()
-                .fill(viewModel.zone.colors.inner.opacity(0.20))
-                .scaleEffect(glowScale * 2.0)
+                .fill(viewModel.zone.colors.inner.opacity(0.14))
+                .scaleEffect(glowScale * 1.7)
                 .blur(radius: 70)
 
             // Inner glow — tighter, more saturated
             Circle()
-                .fill(viewModel.zone.colors.inner.opacity(0.30))
-                .scaleEffect(glowScale * 1.4)
+                .fill(viewModel.zone.colors.inner.opacity(0.20))
+                .scaleEffect(glowScale * 1.25)
                 .blur(radius: 35)
         }
         .frame(width: Theme.orbSize, height: Theme.orbSize)
@@ -177,6 +177,11 @@ struct NavigationView: View {
                 .padding(.top, 70)
                 .accessibilityLabel("Navigating to \(viewModel.destination.name)")
 
+            Text(viewModel.mode.label)
+                .font(Theme.labelFont)
+                .foregroundStyle(Theme.textTertiary)
+                .padding(.top, 6)
+
             Spacer()
 
             // Bottom: Distance and info
@@ -205,6 +210,13 @@ struct NavigationView: View {
                         .font(Theme.captionFont)
                         .foregroundStyle(Theme.textTertiary)
                         .accessibilityLabel(wanderString)
+                }
+
+                if let simpleGuidanceMessage = viewModel.simpleGuidanceMessage {
+                    Text(simpleGuidanceMessage)
+                        .font(Theme.labelFont)
+                        .foregroundStyle(Theme.textTertiary)
+                        .padding(.top, 6)
                 }
             }
             .padding(.bottom, 90)
@@ -260,9 +272,9 @@ struct NavigationView: View {
     private var orbAccessibilityLabel: String {
         let zone = viewModel.zone
         let direction: String
-        if viewModel.deviation > 15 {
+        if viewModel.correctionDirection == .right {
             direction = "Turn right"
-        } else if viewModel.deviation < -15 {
+        } else if viewModel.correctionDirection == .left {
             direction = "Turn left"
         } else {
             direction = "On track"
@@ -301,6 +313,10 @@ struct NavigationView: View {
                 Text("Deviation: \(viewModel.deviation, specifier: "%.1f")°")
                 Text("Zone: \(viewModel.zone.rawValue)")
                 Text("Shift: \(viewModel.directionShift, specifier: "%.2f")")
+                Text("State: \(String(describing: viewModel.currentInstruction.state))")
+                Text("Confidence: \(viewModel.currentInstruction.confidence, specifier: "%.2f")")
+                Text("Mode: \(viewModel.mode.rawValue)")
+                Text("Route: \(viewModel.routeCorridor == nil ? "simple" : "corridor")")
 
                 Text("")
 

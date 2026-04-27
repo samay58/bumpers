@@ -10,6 +10,7 @@ import CoreLocation
 import Combine
 import UIKit
 
+@MainActor
 @Observable
 final class NavigationViewModel {
 
@@ -17,12 +18,14 @@ final class NavigationViewModel {
 
     let destination: Destination
     var arrivalTime: Date?
+    let mode: NavigationMode
 
     // MARK: - Services
 
     let locationService: LocationService
     let hapticService: HapticService
     let liveActivityManager: LiveActivityManager
+    let routeService: RouteService
 
     // MARK: - Navigation State
 
@@ -31,6 +34,20 @@ final class NavigationViewModel {
     var startTime: Date?
     var totalDistance: CLLocationDistance = 0
     var hapticPulseID = 0
+    var routeCorridor: RouteCorridor?
+    var currentInstruction = CorrectionInstruction(
+        state: .acquiringLocation,
+        correctionDirection: nil,
+        severity: .gentle,
+        urgency: 0,
+        hapticPattern: .none,
+        visualTemperature: .cool,
+        confidence: 0,
+        usesSimpleGuidance: false
+    )
+    var isLoadingRoute = false
+    var simpleGuidanceMessage: String?
+    var hapticProfile: HapticProfile
 
     // MARK: - Computed Properties
 
@@ -72,36 +89,34 @@ final class NavigationViewModel {
 
     /// Current temperature zone based on deviation.
     var zone: TemperatureZone {
-        TemperatureZone.from(absoluteDeviation: absoluteDeviation)
+        currentInstruction.visualTemperature
     }
 
     /// Directional shift for the orb (-1 to 1).
     /// -1 = turn hard left, 0 = on track, 1 = turn hard right.
     var directionShift: Double {
-        // Normalize deviation to -1...1 range
-        // Max shift at 90° deviation
-        let normalizedDeviation = deviation / 90.0
-        return max(-1, min(1, normalizedDeviation))
+        guard let direction = currentInstruction.correctionDirection else { return 0 }
+        let magnitude = max(0.2, min(1, currentInstruction.urgency))
+        return direction == .right ? magnitude : -magnitude
     }
 
     var correctionDirection: CorrectionDirection? {
-        guard zone != .hot else { return nil }
-        return deviation > 0 ? .left : .right
+        currentInstruction.correctionDirection
     }
 
     /// Wander budget in seconds (time available beyond minimum walking time).
     var wanderBudget: TimeInterval? {
-        guard let current = currentCoordinate else { return nil }
-        return NavigationCalculator.wanderBudget(
-            currentLocation: current,
-            destination: destination.coordinate,
-            arrivalTime: arrivalTime
-        )
+        guard let arrivalTime else { return nil }
+        let walkingTime = estimatedWalkingTime
+        return max(0, arrivalTime.timeIntervalSinceNow - walkingTime)
     }
 
     /// Estimated walking time to destination in seconds.
     var estimatedWalkingTime: TimeInterval {
-        NavigationCalculator.estimatedWalkingTime(meters: distance)
+        if let route = routeCorridor?.routes.first {
+            return route.expectedTravelTime
+        }
+        return NavigationCalculator.estimatedWalkingTime(meters: distance)
     }
 
     /// Whether heading data is available.
@@ -148,16 +163,12 @@ final class NavigationViewModel {
 
     private var hapticTimer: Timer?
     private var lastHapticTime: Date?
-    private var lastZone: TemperatureZone?
     private var previousLocation: CLLocation?
-
-    // Zone debounce: require 1.5s stability before switching haptic zone
-    private var pendingZone: TemperatureZone?
-    private var pendingZoneStartTime: Date?
-    private var stableZone: TemperatureZone = .hot
-    private var isFirstPlayInNewZone = false
-
-    private static let zoneDebounceInterval: TimeInterval = 1.5
+    private var routeTask: Task<Void, Never>?
+    private var lastRouteOrigin: CLLocation?
+    private var offCorridorSince: Date?
+    private let corridorEngine = CorridorNavigationEngine()
+    private let hapticPatternFactory = HapticPatternFactory()
 
     // MARK: - Journey Tracking
 
@@ -182,21 +193,27 @@ final class NavigationViewModel {
     init(
         destination: Destination,
         arrivalTime: Date? = nil,
+        mode: NavigationMode = .roomToWander,
         locationService: LocationService = LocationService(),
-        hapticService: HapticService = HapticService(),
-        liveActivityManager: LiveActivityManager = LiveActivityManager()
+        hapticService: HapticService? = nil,
+        liveActivityManager: LiveActivityManager = LiveActivityManager(),
+        routeService: RouteService = RouteService(),
+        hapticProfile: HapticProfile = .pocketNormal
     ) {
         self.destination = destination
         self.arrivalTime = arrivalTime
+        self.mode = mode
         self.locationService = locationService
-        self.hapticService = hapticService
+        self.hapticService = hapticService ?? HapticService()
         self.liveActivityManager = liveActivityManager
+        self.routeService = routeService
+        self.hapticProfile = hapticProfile
     }
 
     deinit {
-        // Ensure screen idle timer is re-enabled even if navigation wasn't stopped cleanly
-        UIApplication.shared.isIdleTimerDisabled = false
-        hapticTimer?.invalidate()
+        Task { @MainActor in
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
     }
 
     // MARK: - Navigation Control
@@ -210,6 +227,19 @@ final class NavigationViewModel {
         totalDistance = 0
         previousLocation = nil
         hapticPulseID = 0
+        routeCorridor = nil
+        simpleGuidanceMessage = nil
+        currentInstruction = CorrectionInstruction(
+            state: .acquiringLocation,
+            correctionDirection: nil,
+            severity: .gentle,
+            urgency: 0,
+            hapticPattern: .none,
+            visualTemperature: .cool,
+            confidence: 0,
+            usesSimpleGuidance: false
+        )
+        corridorEngine.reset()
 
         // Reset journey tracking
         journeyPoints = []
@@ -222,6 +252,9 @@ final class NavigationViewModel {
         // Start services
         hapticService.prepare()
         locationService.startUpdating()
+        if let currentLocation {
+            loadRoute(from: currentLocation)
+        }
 
         // Start Live Activity (Lock Screen + Dynamic Island)
         liveActivityManager.startNavigation(
@@ -243,6 +276,7 @@ final class NavigationViewModel {
         // Stop services
         locationService.stopUpdating()
         hapticService.stop()
+        routeTask?.cancel()
 
         // End Live Activity
         liveActivityManager.endNavigation(showFinalState: false)
@@ -257,7 +291,9 @@ final class NavigationViewModel {
     private func startHapticTimer() {
         // Check every 0.5 seconds for haptic timing
         let timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.updateNavigation()
+            Task { @MainActor in
+                self?.updateNavigation()
+            }
         }
         // Add to .common mode so timer continues during UI interaction (scrolling, etc.)
         RunLoop.current.add(timer, forMode: .common)
@@ -273,28 +309,46 @@ final class NavigationViewModel {
         }
         previousLocation = currentLocation
 
+        if let currentLocation {
+            ensureRouteLoaded(from: currentLocation)
+        }
+
+        currentInstruction = corridorEngine.instruction(
+            for: CorridorNavigationInput(
+                currentLocation: currentLocation,
+                currentHeading: currentHeading,
+                destination: destination.coordinate,
+                corridor: routeCorridor,
+                mode: mode,
+                arrivalTime: arrivalTime,
+                now: Date()
+            )
+        )
+        simpleGuidanceMessage = currentInstruction.usesSimpleGuidance ? "Using simple direction guidance" : nil
+
         // Sample journey point for trail visualization
         sampleJourneyPointIfNeeded()
 
         // Update Live Activity with current state
-        liveActivityManager.updateNavigation(zone: zone, distance: distance)
+        liveActivityManager.updateNavigation(zone: currentInstruction.visualTemperature, distance: distance)
 
         // Optimize battery based on navigation state
         updateLocationMode()
 
         // Check for arrival
-        if let current = currentCoordinate,
-           NavigationCalculator.hasArrived(current: current, destination: destination.coordinate) {
+        if currentInstruction.state == .arrived {
             handleArrival()
             return
         }
+
+        updateRerouteState()
 
         // Fire haptics based on zone and timing
         fireHapticsIfNeeded()
     }
 
     private func updateLocationMode() {
-        let currentZone = zone
+        let currentZone = currentInstruction.visualTemperature
         let currentDistance = distance
 
         // Precise mode: close to destination or significantly off-track
@@ -312,50 +366,20 @@ final class NavigationViewModel {
     }
 
     private func fireHapticsIfNeeded() {
-        guard hasHeading else { return }
-
-        let currentZone = zone
+        let kind = currentInstruction.hapticPattern
+        guard kind != .none else { return }
         let now = Date()
 
-        // Zone debounce: require 1.5s stability before adopting a new zone
-        if currentZone != stableZone {
-            if pendingZone == currentZone {
-                if let start = pendingZoneStartTime,
-                   now.timeIntervalSince(start) >= Self.zoneDebounceInterval {
-                    stableZone = currentZone
-                    pendingZone = nil
-                    pendingZoneStartTime = nil
-                    isFirstPlayInNewZone = true
-                }
-            } else {
-                pendingZone = currentZone
-                pendingZoneStartTime = now
-            }
-        } else {
-            pendingZone = nil
-            pendingZoneStartTime = nil
-        }
-
         // Check if enough time has passed since last haptic
-        let interval = stableZone.hapticInterval
+        let pattern = hapticPatternFactory.makePattern(kind, profile: hapticProfile)
+        let interval = pattern.cooldown
         if let lastTime = lastHapticTime {
             guard now.timeIntervalSince(lastTime) >= interval else { return }
         }
 
-        // If user just corrected course (zone improved), give them a reward pause
-        if let last = lastZone, stableZone.hapticInterval > last.hapticInterval {
-            lastHapticTime = now
-            lastZone = stableZone
-            return
-        }
-
-        // Fire haptic with direction and boundary blending
-        let scale: Float = isFirstPlayInNewZone ? 0.75 : 1.0
-        hapticService.playForZone(stableZone, direction: correctionDirection, intensityScale: scale)
-        if isFirstPlayInNewZone { isFirstPlayInNewZone = false }
+        hapticService.play(kind, profile: hapticProfile)
 
         lastHapticTime = now
-        lastZone = stableZone
         hapticPulseID += 1
     }
 
@@ -363,7 +387,7 @@ final class NavigationViewModel {
         guard !hasArrived else { return }
 
         hasArrived = true
-        hapticService.playArrival()
+        hapticService.play(.arrival, profile: hapticProfile)
 
         // End Live Activity with celebration state (shows for 5 seconds)
         liveActivityManager.endNavigation(showFinalState: true)
@@ -424,6 +448,73 @@ final class NavigationViewModel {
         // Update tracking state
         lastSampledLocation = location
         lastSampledZone = currentZone
+    }
+
+    // MARK: - Route Loading
+
+    private func ensureRouteLoaded(from location: CLLocation) {
+        if routeCorridor == nil, !isLoadingRoute {
+            loadRoute(from: location)
+            return
+        }
+
+        if let lastRouteOrigin, location.distance(from: lastRouteOrigin) > 80,
+           case .offCourse = currentInstruction.state,
+           !isLoadingRoute {
+            loadRoute(from: location)
+        }
+    }
+
+    private func loadRoute(from location: CLLocation) {
+        routeTask?.cancel()
+        isLoadingRoute = true
+        lastRouteOrigin = location
+
+        routeTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let routes = try await routeService.walkingRoutes(
+                    from: location.coordinate,
+                    to: destination.coordinate
+                )
+                await MainActor.run {
+                    self.routeCorridor = RouteCorridor(
+                        routes: routes,
+                        mode: self.mode,
+                        destination: self.destination.coordinate
+                    )
+                    self.simpleGuidanceMessage = nil
+                    self.isLoadingRoute = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.routeCorridor = nil
+                    self.simpleGuidanceMessage = "Using simple direction guidance"
+                    self.isLoadingRoute = false
+                }
+            }
+        }
+    }
+
+    private func updateRerouteState() {
+        let now = Date()
+        switch currentInstruction.state {
+        case .offCourse:
+            if offCorridorSince == nil {
+                offCorridorSince = now
+            }
+            if let since = offCorridorSince,
+               now.timeIntervalSince(since) >= 45,
+               let currentLocation,
+               !isLoadingRoute {
+                loadRoute(from: currentLocation)
+                offCorridorSince = nil
+            }
+        case .drifting, .wrongWay:
+            break
+        case .acquiringLocation, .lowConfidence, .inLane, .arrived, .simpleGuidance:
+            offCorridorSince = nil
+        }
     }
 
     // MARK: - Journey Export

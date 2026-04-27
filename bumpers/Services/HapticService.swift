@@ -3,19 +3,21 @@
 //  bumpers
 //
 //  Core Haptics wrapper for directional navigation feedback.
-//  Direction is encoded in tap sequence order: rising = correct right, falling = correct left.
+//  Direction is encoded with duration rhythm for pocket legibility.
 //
 
 import Foundation
 import CoreHaptics
 import UIKit
 
+@MainActor
 final class HapticService {
 
     // MARK: - Properties
 
     private var engine: CHHapticEngine?
     private var isEngineRunning = false
+    private let patternFactory = HapticPatternFactory()
 
     private let impactLight = UIImpactFeedbackGenerator(style: .light)
     private let impactMedium = UIImpactFeedbackGenerator(style: .medium)
@@ -83,144 +85,47 @@ final class HapticService {
 
     // MARK: - Public API
 
-    func playForZone(_ zone: TemperatureZone, direction: CorrectionDirection? = nil, intensityScale: Float = 1.0) {
-        switch zone {
-        case .hot:
-            playNod(intensityScale: intensityScale)
-        case .warm, .cool, .cold, .freezing:
-            if let direction = direction {
-                playDirectional(zone: zone, direction: direction, intensityScale: intensityScale)
-            } else {
-                playNod(intensityScale: intensityScale)
-            }
-        }
+    func play(_ kind: HapticPatternKind, profile: HapticProfile = .pocketNormal) {
+        let pattern = patternFactory.makePattern(kind, profile: profile)
+        playPattern(pattern)
     }
 
     func playArrival() {
-        guard supportsHaptics, isEngineRunning else {
-            notificationGenerator.notificationOccurred(.success)
-            return
-        }
-
-        let events = [
-            makeTransient(at: 0.0, intensity: 0.30, sharpness: 0.50),
-            makeTransient(at: 0.12, intensity: 0.50, sharpness: 0.55),
-            makeTransient(at: 0.24, intensity: 0.70, sharpness: 0.60),
-            makeTransient(at: 0.36, intensity: 0.90, sharpness: 0.70),
-            makeContinuous(at: 0.45, intensity: 0.60, sharpness: 0.15, duration: 0.6,
-                           attackTime: 0.05, releaseTime: 0.4),
-        ]
-
-        playPattern(events: events)
+        play(.arrival)
     }
 
-    // MARK: - Hot Zone: The Nod
+    private func playPattern(_ pattern: HapticPattern) {
+        guard !pattern.events.isEmpty else { return }
 
-    private func playNod(intensityScale: Float) {
         guard supportsHaptics, isEngineRunning else {
-            impactLight.impactOccurred(intensity: CGFloat(0.35 * intensityScale))
+            playFallback(kind: pattern.kind)
             return
         }
 
-        let events = [
-            makeTransient(at: 0.0, intensity: 0.35 * intensityScale, sharpness: 0.55),
-            makeContinuous(at: 0.02, intensity: 0.15 * intensityScale, sharpness: 0.10, duration: 0.08),
-        ]
-
-        playPattern(events: events)
-    }
-
-    // MARK: - Directional Patterns
-
-    private func playDirectional(zone: TemperatureZone, direction: CorrectionDirection, intensityScale: Float) {
-        guard supportsHaptics, isEngineRunning else {
-            playFallback(zone: zone)
-            return
-        }
-
-        let events: [CHHapticEvent]
-
-        switch zone {
-        case .warm:
-            events = makeDirectionalTaps(
-                intensities: [0.25, 0.45],
-                sharpness: 0.65,
-                gap: 0.08,
-                direction: direction,
-                intensityScale: intensityScale
-            )
-        case .cool:
-            events = makeDirectionalTaps(
-                intensities: [0.25, 0.60],
-                sharpness: 0.70,
-                gap: 0.07,
-                direction: direction,
-                intensityScale: intensityScale
-            )
-        case .cold:
-            events = makeDirectionalTaps(
-                intensities: [0.25, 0.50, 0.75],
-                sharpness: 0.75,
-                gap: 0.06,
-                direction: direction,
-                intensityScale: intensityScale
-            )
-        case .freezing:
-            let taps = makeDirectionalTaps(
-                intensities: [0.20, 0.45, 0.65, 0.85],
-                sharpness: 0.80,
-                gap: 0.05,
-                direction: direction,
-                intensityScale: intensityScale
-            )
-            let rumble = makeContinuous(
-                at: 0.0,
-                intensity: 0.30 * intensityScale,
-                sharpness: 0.05,
-                duration: 0.25
-            )
-            events = [rumble] + taps
-        default:
-            return
-        }
-
-        playPattern(events: events)
-    }
-
-    // MARK: - Pattern Builder
-
-    private func makeDirectionalTaps(
-        intensities: [Float],
-        sharpness: Float,
-        gap: TimeInterval,
-        direction: CorrectionDirection,
-        intensityScale: Float
-    ) -> [CHHapticEvent] {
-        let ordered = direction == .right ? intensities : intensities.reversed()
-
-        return ordered.enumerated().map { index, intensity in
-            makeTransient(
-                at: Double(index) * gap,
-                intensity: intensity * intensityScale,
-                sharpness: sharpness
-            )
-        }
+        playPattern(events: pattern.events.map(makeEvent))
     }
 
     // MARK: - UIKit Fallback
 
-    private func playFallback(zone: TemperatureZone) {
-        switch zone {
-        case .hot:
+    private func playFallback(kind: HapticPatternKind) {
+        switch kind {
+        case .none:
+            return
+        case .onTrackNod, .lowConfidence:
             impactLight.impactOccurred(intensity: 0.4)
-        case .warm:
-            impactMedium.impactOccurred()
-        case .cool:
+        case .correctLeft(let severity), .correctRight(let severity):
+            switch severity {
+            case .gentle:
+                impactLight.impactOccurred(intensity: 0.8)
+            case .medium:
+                impactMedium.impactOccurred()
+            case .strong, .urgent:
+                impactHeavy.impactOccurred()
+            }
+        case .wrongWay:
             notificationGenerator.notificationOccurred(.warning)
-        case .cold:
-            impactHeavy.impactOccurred()
-        case .freezing:
-            notificationGenerator.notificationOccurred(.error)
+        case .arrival:
+            notificationGenerator.notificationOccurred(.success)
         }
     }
 
@@ -235,6 +140,22 @@ final class HapticService {
             ],
             relativeTime: time
         )
+    }
+
+    private func makeEvent(_ spec: HapticEventSpec) -> CHHapticEvent {
+        switch spec.type {
+        case .transient:
+            return makeTransient(at: spec.relativeTime, intensity: spec.intensity, sharpness: spec.sharpness)
+        case .continuous:
+            return makeContinuous(
+                at: spec.relativeTime,
+                intensity: spec.intensity,
+                sharpness: spec.sharpness,
+                duration: spec.duration,
+                attackTime: spec.attackTime,
+                releaseTime: spec.releaseTime
+            )
+        }
     }
 
     private func makeContinuous(
