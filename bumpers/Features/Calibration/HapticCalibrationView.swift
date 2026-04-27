@@ -1,149 +1,160 @@
 import SwiftUI
 
 struct HapticCalibrationView: View {
-    let hapticProfile: HapticProfile
-    let hapticService: HapticService
-    let onComplete: (HapticProfile) -> Void
+    let flow: HapticCalibrationFlow
+    let onStart: () -> Void
+    let onRecord: (CalibrationResult) -> Void
+    let onReplay: () -> Void
     let onSkip: () -> Void
 
-    @State private var step: Step = .intro
-    @State private var rightResult: CalibrationResult?
-    @State private var leftResult: CalibrationResult?
-
-    private let calibrationService = HapticCalibrationService()
-
     var body: some View {
-        ZStack {
-            Theme.background
-                .ignoresSafeArea()
+        VStack(spacing: 0) {
+            topBar
+                .padding(.top, 28)
+                .padding(.horizontal, Theme.Spacing.xxl)
 
-            VStack(spacing: Theme.Spacing.xl) {
+            Spacer(minLength: 44)
+
+            hero
+                .padding(.bottom, Theme.Spacing.xl)
+
+            copyBlock
+                .padding(.horizontal, Theme.Spacing.xxl)
+
+            Spacer(minLength: 36)
+
+            footerActions
+                .padding(.horizontal, Theme.Spacing.xxl)
+                .padding(.bottom, 32)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.background.ignoresSafeArea())
+    }
+
+    private var topBar: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            HStack {
+                Text(flow.progressLabel)
+                    .font(Theme.labelFont)
+                    .foregroundStyle(Theme.textTertiary)
+                    .textCase(.uppercase)
+                    .tracking(0.6)
+
                 Spacer()
 
-                Image(systemName: "iphone.radiowaves.left.and.right")
-                    .font(.system(size: 42, weight: .light))
-                    .foregroundStyle(Theme.warm.inner)
-
-                VStack(spacing: Theme.Spacing.sm) {
-                    Text(title)
-                        .font(Theme.sheetTitleFont)
-                        .foregroundStyle(Theme.textPrimary)
-                        .multilineTextAlignment(.center)
-
-                    Text(subtitle)
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Theme.textTertiary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, Theme.Spacing.xl)
+                Button("Skip") {
+                    onSkip()
                 }
+                .font(Theme.captionFont)
+                .foregroundStyle(Theme.textTertiary)
+            }
 
-                Spacer()
+            HStack(spacing: 8) {
+                ForEach(0..<2, id: \.self) { index in
+                    Capsule()
+                        .fill(progressColor(for: index))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 4)
+                }
+            }
+        }
+    }
 
-                VStack(spacing: Theme.Spacing.md) {
-                    if step == .intro {
-                        Button("Start") {
-                            hapticService.prepare()
-                            step = .right
-                            playRight()
-                        }
-                        .bumperButton(.primary)
-                    } else {
-                        Button("Clear") {
-                            record(.clear)
-                        }
-                        .bumperButton(.primary)
+    private var hero: some View {
+        ZStack {
+            Circle()
+                .fill(Theme.warm.inner.opacity(0.08))
+                .frame(width: 200, height: 200)
+                .blur(radius: 40)
 
-                        Button("Too weak") {
-                            record(.tooWeak)
-                        }
-                        .bumperButton(.secondary)
+            RoundedRectangle(cornerRadius: 28)
+                .fill(Theme.surfaceDefault)
+                .frame(width: 112, height: 112)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28)
+                        .stroke(Theme.borderDefault, lineWidth: 1)
+                )
 
-                        Button("Couldn't feel it") {
-                            record(.couldNotFeel)
-                        }
-                        .bumperButton(.secondary)
+            Image(systemName: flow.showsResponseButtons ? "iphone.radiowaves.left.and.right" : "iphone")
+                .font(.system(size: 40, weight: .light))
+                .foregroundStyle(Theme.warm.inner)
+        }
+    }
 
-                        Button(step == .right ? "Replay right" : "Replay left") {
-                            step == .right ? playRight() : playLeft()
-                        }
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Theme.textTertiary)
-                        .padding(.top, Theme.Spacing.sm)
-                    }
+    private var copyBlock: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            Text(flow.title)
+                .font(Theme.screenTitleFont)
+                .foregroundStyle(Theme.textPrimary)
+                .multilineTextAlignment(.center)
 
-                    Button("Skip") {
-                        onSkip()
+            Text(flow.subtitle)
+                .font(Theme.captionFont)
+                .foregroundStyle(Theme.textSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var footerActions: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            if flow.showsResponseButtons {
+                Button(flow.primaryButtonTitle) {
+                    onRecord(.clear)
+                }
+                .bumperButton(.primary)
+
+                Button("Too weak") {
+                    onRecord(.tooWeak)
+                }
+                .bumperButton(.secondary)
+
+                Button("Couldn't feel it") {
+                    onRecord(.couldNotFeel)
+                }
+                .bumperButton(.secondary)
+
+                if let replayButtonTitle = flow.replayButtonTitle {
+                    Button(replayButtonTitle) {
+                        onReplay()
                     }
                     .font(Theme.captionFont)
                     .foregroundStyle(Theme.textTertiary)
                     .padding(.top, Theme.Spacing.sm)
                 }
-                .padding(.horizontal, Theme.Spacing.xxl)
-                .padding(.bottom, 44)
+            } else {
+                Button(flow.primaryButtonTitle) {
+                    onStart()
+                }
+                .bumperButton(.primary)
+
+                Text("Front pocket is the truth test. Handheld is fine for calibration but less honest.")
+                    .font(Theme.labelFont)
+                    .foregroundStyle(Theme.textTertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, Theme.Spacing.sm)
             }
         }
     }
 
-    private var title: String {
-        switch step {
+    private func progressColor(for index: Int) -> Color {
+        switch flow.step {
         case .intro:
-            return "Put your phone where you'll walk with it"
+            return Theme.borderDefault
         case .right:
-            return "This means correct right"
+            return index == 0 ? Theme.warm.inner : Theme.borderDefault
         case .left:
-            return "This means correct left"
+            return Theme.warm.inner
         }
-    }
-
-    private var subtitle: String {
-        switch step {
-        case .intro:
-            return "Bumper works only if the pattern survives your real pocket, fabric, and stride."
-        case .right:
-            return "Short pulse, then longer pulse."
-        case .left:
-            return "Long pulse, then short pulse."
-        }
-    }
-
-    private func record(_ result: CalibrationResult) {
-        switch step {
-        case .intro:
-            return
-        case .right:
-            rightResult = result
-            step = .left
-            playLeft()
-        case .left:
-            leftResult = result
-            let profile = calibrationService.recommendedProfile(
-                rightResult: rightResult ?? .tooWeak,
-                leftResult: leftResult ?? result
-            )
-            onComplete(profile)
-        }
-    }
-
-    private func playRight() {
-        hapticService.play(.correctRight(severity: .medium), profile: hapticProfile)
-    }
-
-    private func playLeft() {
-        hapticService.play(.correctLeft(severity: .medium), profile: hapticProfile)
-    }
-
-    private enum Step {
-        case intro
-        case right
-        case left
     }
 }
 
 #Preview {
     HapticCalibrationView(
-        hapticProfile: .pocketNormal,
-        hapticService: HapticService(),
-        onComplete: { _ in },
+        flow: HapticCalibrationFlow(),
+        onStart: {},
+        onRecord: { _ in },
+        onReplay: {},
         onSkip: {}
     )
 }

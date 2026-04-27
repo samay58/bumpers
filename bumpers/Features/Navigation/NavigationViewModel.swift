@@ -104,6 +104,31 @@ final class NavigationViewModel {
         currentInstruction.correctionDirection
     }
 
+    var statusText: String {
+        switch currentInstruction.state {
+        case .acquiringLocation:
+            return "Finding your location"
+        case .lowConfidence(.poorLocationAccuracy):
+            return "GPS uncertain"
+        case .lowConfidence(.headingUnavailable):
+            return locationService.headingAvailable ? "Calibrating direction" : "Start walking to detect direction"
+        case .lowConfidence(.locationUnavailable):
+            return "Location unavailable"
+        case .inLane:
+            return "In lane"
+        case .drifting(let direction, _):
+            return "Ease \(direction.label)"
+        case .offCourse(let direction, _):
+            return "Correct \(direction.label)"
+        case .wrongWay:
+            return "You're moving away"
+        case .arrived:
+            return "Arrived"
+        case .simpleGuidance:
+            return "Simple direction guidance"
+        }
+    }
+
     /// Wander budget in seconds (time available beyond minimum walking time).
     var wanderBudget: TimeInterval? {
         guard let arrivalTime else { return nil }
@@ -194,19 +219,19 @@ final class NavigationViewModel {
         destination: Destination,
         arrivalTime: Date? = nil,
         mode: NavigationMode = .roomToWander,
-        locationService: LocationService = LocationService(),
+        locationService: LocationService? = nil,
         hapticService: HapticService? = nil,
-        liveActivityManager: LiveActivityManager = LiveActivityManager(),
-        routeService: RouteService = RouteService(),
+        liveActivityManager: LiveActivityManager? = nil,
+        routeService: RouteService? = nil,
         hapticProfile: HapticProfile = .pocketNormal
     ) {
         self.destination = destination
         self.arrivalTime = arrivalTime
         self.mode = mode
-        self.locationService = locationService
+        self.locationService = locationService ?? LocationService()
         self.hapticService = hapticService ?? HapticService()
-        self.liveActivityManager = liveActivityManager
-        self.routeService = routeService
+        self.liveActivityManager = liveActivityManager ?? LiveActivityManager()
+        self.routeService = routeService ?? RouteService()
         self.hapticProfile = hapticProfile
     }
 
@@ -291,9 +316,8 @@ final class NavigationViewModel {
     private func startHapticTimer() {
         // Check every 0.5 seconds for haptic timing
         let timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.updateNavigation()
-            }
+            guard let self else { return }
+            self.updateNavigation()
         }
         // Add to .common mode so timer continues during UI interaction (scrolling, etc.)
         RunLoop.current.add(timer, forMode: .common)

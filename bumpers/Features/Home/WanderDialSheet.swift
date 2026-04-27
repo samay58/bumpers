@@ -19,8 +19,11 @@ struct WanderDialSheet: View {
     @State private var showNavigation = false
     @State private var walkEstimate: WalkEstimateState = .findingLocation
     @State private var selectedMode: NavigationMode = .roomToWander
-    @State private var showCalibration = false
     @State private var estimateTask: Task<Void, Never>?
+    @State private var sheetStage: SheetStage = .undecided
+    @State private var calibrationFlow = HapticCalibrationFlow()
+    @State private var calibrationHapticService = HapticService()
+    @State private var hasInitializedStage = false
 
     // For haptic tick feedback on slider
     @State private var lastTickValue: Int = 12 // 60/5 = 12 ticks
@@ -40,70 +43,86 @@ struct WanderDialSheet: View {
                 Theme.background
                     .ignoresSafeArea()
 
-                VStack(spacing: 0) {
-                    Spacer()
-                        .frame(height: 40)
-
-                    destinationHeader
-                        .padding(.bottom, Theme.Spacing.xxxl)
-                        .opacity(isTransitioning ? 0 : 1)
-
-                    walkTimeEstimate
-                        .padding(.bottom, 40)
-                        .opacity(isTransitioning ? 0 : 1)
-
-                    NavigationModePicker(selectedMode: $selectedMode)
-                        .padding(.horizontal, Theme.Spacing.xxl)
-                        .padding(.bottom, Theme.Spacing.xl)
-                        .opacity(isTransitioning ? 0 : 1)
-
-                    wanderDial
-                        .padding(.horizontal, Theme.Spacing.xxl)
-                        .padding(.bottom, Theme.Spacing.xxxl)
-                        .opacity(isTransitioning ? 0 : 1)
-
-                    wanderBudgetDisplay
-                        .padding(.bottom, Theme.Spacing.xxxl)
-                        .opacity(isTransitioning ? 0 : 1)
-
-                    startButton
-                        .padding(.horizontal, Theme.Spacing.xxl)
-
-                    Spacer()
+                Group {
+                    switch sheetStage {
+                    case .undecided:
+                        Color.clear
+                    case .calibration:
+                        calibrationStage
+                    case .planning:
+                        planningStage
+                    }
                 }
-                .animation(.easeOut(duration: 0.25), value: isTransitioning)
             }
             .navigationDestination(isPresented: $showNavigation) {
                 NavigationView(viewModel: createViewModel())
             }
             .onAppear {
+                initializeStageIfNeeded()
                 locationService.requestPermission()
                 locationService.startUpdating()
                 updateWalkTimeEstimate()
-                showCalibration = !hasSeenHapticCalibration
             }
             .onChange(of: locationService.currentLocation) { _, _ in
                 updateWalkTimeEstimate()
-            }
-            .sheet(isPresented: $showCalibration) {
-                HapticCalibrationView(
-                    hapticProfile: hapticProfile,
-                    hapticService: HapticService(),
-                    onComplete: { profile in
-                        hapticProfileRawValue = profile.rawValue
-                        hasSeenHapticCalibration = true
-                        showCalibration = false
-                    },
-                    onSkip: {
-                        hasSeenHapticCalibration = true
-                        showCalibration = false
-                    }
-                )
             }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .presentationBackground(Theme.background)
+    }
+
+    private var calibrationStage: some View {
+        HapticCalibrationView(
+            flow: calibrationFlow,
+            onStart: {
+                runCalibrationTransition(calibrationFlow.start())
+            },
+            onRecord: { result in
+                runCalibrationTransition(calibrationFlow.record(result))
+            },
+            onReplay: {
+                runCalibrationTransition(calibrationFlow.replay())
+            },
+            onSkip: {
+                finishCalibration(with: nil)
+            }
+        )
+    }
+
+    private var planningStage: some View {
+        VStack(spacing: 0) {
+            Spacer()
+                .frame(height: 40)
+
+            destinationHeader
+                .padding(.bottom, Theme.Spacing.xxxl)
+                .opacity(isTransitioning ? 0 : 1)
+
+            walkTimeEstimate
+                .padding(.bottom, 40)
+                .opacity(isTransitioning ? 0 : 1)
+
+            NavigationModePicker(selectedMode: $selectedMode)
+                .padding(.horizontal, Theme.Spacing.xxl)
+                .padding(.bottom, Theme.Spacing.xl)
+                .opacity(isTransitioning ? 0 : 1)
+
+            wanderDial
+                .padding(.horizontal, Theme.Spacing.xxl)
+                .padding(.bottom, Theme.Spacing.xxxl)
+                .opacity(isTransitioning ? 0 : 1)
+
+            wanderBudgetDisplay
+                .padding(.bottom, Theme.Spacing.xxxl)
+                .opacity(isTransitioning ? 0 : 1)
+
+            startButton
+                .padding(.horizontal, Theme.Spacing.xxl)
+
+            Spacer()
+        }
+        .animation(.easeOut(duration: 0.25), value: isTransitioning)
     }
 
     // MARK: - Destination Header
@@ -317,6 +336,35 @@ struct WanderDialSheet: View {
         isNoRush || walkEstimate.seconds != nil
     }
 
+    private func initializeStageIfNeeded() {
+        guard !hasInitializedStage else { return }
+        hasInitializedStage = true
+        sheetStage = hasSeenHapticCalibration ? .planning : .calibration
+        calibrationHapticService.prepare()
+    }
+
+    private func runCalibrationTransition(_ transition: HapticCalibrationFlow.Transition?) {
+        guard let transition else { return }
+
+        switch transition {
+        case .play(let pattern):
+            calibrationHapticService.prepare()
+            calibrationHapticService.play(pattern, profile: hapticProfile)
+        case .complete(let profile):
+            finishCalibration(with: profile)
+        }
+    }
+
+    private func finishCalibration(with profile: HapticProfile?) {
+        if let profile {
+            hapticProfileRawValue = profile.rawValue
+        }
+        hasSeenHapticCalibration = true
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+            sheetStage = .planning
+        }
+    }
+
     // MARK: - Slider Helpers
 
     private func sliderFillWidth(in totalWidth: CGFloat) -> CGFloat {
@@ -390,6 +438,12 @@ struct WanderDialSheet: View {
             hapticProfile: hapticProfile
         )
     }
+}
+
+private enum SheetStage {
+    case undecided
+    case calibration
+    case planning
 }
 
 // MARK: - Color Interpolation

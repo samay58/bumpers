@@ -67,8 +67,8 @@ Simulator pass criteria:
 - Search results use nearby context when simulated location is available.
 - Wander sheet never shows a fake 15-minute estimate.
 - Mode picker works.
-- Calibration flow can be completed or skipped.
-- Navigation screen shows mode, confidence/debug state, and simple-guidance fallback when routing fails.
+- First-run calibration advances reliably, can be skipped, and drops back into the wander setup without reopening.
+- Navigation screen shows mode, current status (`In lane`, `GPS uncertain`, `Simple direction guidance`, etc.), confidence/debug state, and simple-guidance fallback when routing fails.
 - Unit tests pass.
 
 ---
@@ -89,6 +89,7 @@ Expected:
 
 - Search result and ETA feel native-quality.
 - In-lane state is mostly silent.
+- Stationary phone rotation may not visibly move the orb while the status remains `In lane`; V2 is correction-driven, not a live compass visualization.
 - No repeated false corrections while walking a plausible route.
 - Arrival triggers only after staying near the destination for a few seconds.
 

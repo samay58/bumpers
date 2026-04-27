@@ -1077,6 +1077,55 @@ Pivoted Bumper from a pure crow-flies compass into a route-aware soft corridor p
 
 ---
 
+## Session 16: Onboarding Reliability + Navigation Legibility
+
+**Date:** 2026-04-27
+**Duration:** ~1 focused cleanup pass
+**Phase:** 6 (Route-Aware V2) — Device UX hardening
+
+### Issue
+
+Real-device feedback exposed two core product problems:
+
+- The first-run haptic calibration felt flaky and low-trust. The intro `Start` action could appear to do nothing, and the whole flow read like a nested prototype rather than a coherent onboarding step.
+- The navigation orb could look dead while the system was actually working, because V2 intentionally keeps the orb calm while the user is still inside the route corridor.
+
+### Root Cause
+
+The calibration flow was presented as a nested `.sheet` from `WanderDialSheet`, while the parent sheet continued updating location and ETA state underneath it. That made the calibration UI feel transient and weakly owned. The flow logic also lived inside the view's local `@State`, so there was no testable state machine for step progression.
+
+Separately, the navigation screen relied on the orb alone to communicate state. In corridor mode, `inLane` correctly returns no correction, but the UI did not make that calm state explicit enough.
+
+### Fixes Applied
+
+**1. Extracted calibration flow state**
+- Added `HapticCalibrationFlow.swift` as a deterministic state machine for intro → right cue → left cue → completion.
+- Added `HapticCalibrationFlowTests.swift` covering start, replay, progression, and completion profile selection.
+
+**2. Rebuilt first-run calibration inside WanderDial**
+- Removed the nested calibration `.sheet`.
+- `WanderDialSheet` now has an explicit staged flow: undecided → calibration → planning.
+- Profile completion and skip both transition back into the main wander setup cleanly without reopening.
+
+**3. Reworked calibration UI**
+- `HapticCalibrationView` is now driven by the extracted flow model instead of managing its own private onboarding state.
+- Added clearer progress language, more explicit cue copy, cleaner button labeling, and a more intentional visual hierarchy.
+
+**4. Made calm navigation states legible**
+- Added a subtle navigation status chip to `NavigationView` so `In lane`, `GPS uncertain`, `Simple direction guidance`, and correction states are visible without opening debug.
+- Added a small label helper on `CorrectionDirection` for clean user-facing copy.
+
+**5. Cleaned up new warnings**
+- Removed the actor-isolated default-initializer warnings added around `NavigationViewModel` dependency defaults by moving service construction into the `@MainActor` initializer body.
+
+### Verification
+
+- `xcodebuild -scheme bumpers -destination id=1EE1C676-F263-4002-A04A-4DB9907DC54D -derivedDataPath /tmp/bumpers-dd -only-testing:bumpersTests test` passed.
+- New `HapticCalibrationFlowTests` passed alongside the existing V2 navigation, search/ETA, and haptic tests.
+- `docs/WALK-TESTS.md` now explicitly documents that in corridor mode, stationary rotation may leave the orb visually calm while status remains `In lane`.
+
+---
+
 ## Index of Decisions (Updated)
 
 | Topic | Decision | Session |

@@ -182,6 +182,9 @@ struct NavigationView: View {
                 .foregroundStyle(Theme.textTertiary)
                 .padding(.top, 6)
 
+            statusChip
+                .padding(.top, 12)
+
             Spacer()
 
             // Bottom: Distance and info
@@ -212,15 +215,26 @@ struct NavigationView: View {
                         .accessibilityLabel(wanderString)
                 }
 
-                if let simpleGuidanceMessage = viewModel.simpleGuidanceMessage {
-                    Text(simpleGuidanceMessage)
-                        .font(Theme.labelFont)
-                        .foregroundStyle(Theme.textTertiary)
-                        .padding(.top, 6)
-                }
             }
             .padding(.bottom, 90)
         }
+    }
+
+    private var statusChip: some View {
+        Text(viewModel.statusText)
+            .font(Theme.captionFont)
+            .foregroundStyle(statusColor)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(statusColor.opacity(0.12))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(statusColor.opacity(0.16), lineWidth: 1)
+            )
+            .accessibilityLabel("Navigation status: \(viewModel.statusText)")
     }
 
     // MARK: - Subviews
@@ -267,6 +281,19 @@ struct NavigationView: View {
 
     private var gpsAccuracy: Double? {
         viewModel.currentLocation?.horizontalAccuracy
+    }
+
+    private var statusColor: Color {
+        switch viewModel.currentInstruction.state {
+        case .inLane, .arrived:
+            return Theme.textSecondary
+        case .drifting, .simpleGuidance:
+            return Theme.warm.inner
+        case .offCourse, .wrongWay:
+            return Theme.hot.inner
+        case .acquiringLocation, .lowConfidence:
+            return Theme.textTertiary
+        }
     }
 
     private var orbAccessibilityLabel: String {
