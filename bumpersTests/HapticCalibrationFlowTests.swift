@@ -1,6 +1,7 @@
 import Testing
 @testable import bumpers
 
+@MainActor
 struct HapticCalibrationFlowTests {
 
     @Test func startAdvancesToRightCue() {

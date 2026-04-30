@@ -7,7 +7,6 @@
 
 import Foundation
 import CoreLocation
-import Combine
 import UIKit
 
 @MainActor
@@ -348,7 +347,9 @@ final class NavigationViewModel {
         // Check every 0.5 seconds for haptic timing
         let timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self else { return }
-            self.updateNavigation()
+            Task { @MainActor in
+                self.updateNavigation()
+            }
         }
         // Add to .common mode so timer continues during UI interaction (scrolling, etc.)
         RunLoop.current.add(timer, forMode: .common)

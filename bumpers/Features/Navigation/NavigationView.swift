@@ -71,9 +71,6 @@ struct NavigationView: View {
                 showArrival = true
             }
         }
-        .onChange(of: viewModel.zone) { _, _ in
-            // Restart animation on zone change for smooth color transition
-        }
         .fullScreenCover(isPresented: $showArrival) {
             ArrivalView(
                 destination: viewModel.destination,

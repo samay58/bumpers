@@ -3,6 +3,7 @@ import MapKit
 import Testing
 @testable import bumpers
 
+@MainActor
 struct V2NavigationTests {
 
     @Test func correctionDirectionMatchesPositiveRightConvention() {

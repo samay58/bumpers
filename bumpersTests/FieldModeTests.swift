@@ -1,6 +1,7 @@
 import Testing
 @testable import bumpers
 
+@MainActor
 struct FieldModeTests {
 
     @Test func inLaneFieldModeKeepsOrbAliveWithoutDirectionalCorrection() {

@@ -454,11 +454,6 @@ struct WanderDialSheet: View {
         }
     }
 
-    /// Current tick value for haptic feedback (changes every 5 minutes)
-    private var currentTickValue: Int {
-        Int(wanderMinutes / tickInterval)
-    }
-
     // MARK: - Helpers
 
     private func updateWalkTimeEstimate() {

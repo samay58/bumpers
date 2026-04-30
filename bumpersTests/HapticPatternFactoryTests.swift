@@ -1,6 +1,7 @@
 import Testing
 @testable import bumpers
 
+@MainActor
 struct HapticPatternFactoryTests {
 
     @Test func pocketDirectionPatternsUseDurationOrder() {

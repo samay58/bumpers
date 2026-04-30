@@ -811,13 +811,13 @@ Researched Lumy app (sun/moon tracker) and implemented premium micro-interaction
 
 ### What We Built
 
-Replaced placeholder app icon with ChatGPT-generated fire/wave yin-yang design — perfect metaphor for "hot or cold" navigation.
+Replaced placeholder app icon with a fire/wave yin-yang design that matches the hot/cold navigation metaphor.
 
 ### Image Processing
 
 | Step | Action |
 |------|--------|
-| Source | `~/Downloads/ChatGPT Image Jan 2, 2026...png` (1024x1024) |
+| Source | 1024x1024 generated concept image |
 | Issue | Black background padding around icon |
 | Fix | `magick -fuzz 5% -trim` to extract content (876x862) |
 | Resize | Scaled to fill 1024x1024 canvas |
@@ -1178,6 +1178,31 @@ Implemented Field Mode as the default validation posture for Bumper V2. The pass
 - `xcodebuild -scheme bumpers -destination 'platform=iOS Simulator,name=iPhone 17' build` passed.
 - `xcodebuild -scheme bumpers -destination 'platform=iOS Simulator,name=iPhone 17' -skip-testing:bumpersUITests test -quiet` passed.
 - Real-device Field Mode walk testing remains the product gate.
+
+---
+
+## Session 19: Post-Merge Tightening Pass
+
+**Date:** 2026-04-30
+**Duration:** Cleanup pass
+**Phase:** 6 (Route-Aware V2) - Quality
+
+### What Changed
+
+Ran a post-merge hygiene pass over Field Mode, navigation UI, tests, and docs.
+
+### Key Updates
+
+- Removed unused SwiftUI code and unused imports.
+- Removed an empty zone-change handler from `NavigationView`.
+- Moved the navigation timer callback through `MainActor` explicitly.
+- Marked haptic/navigation test suites `@MainActor` to keep the unit-test gate readable under the project's default actor isolation.
+- Cleaned historical icon-source wording in this log.
+
+### Verification
+
+- `xcodebuild -scheme bumpers -destination 'platform=iOS Simulator,name=iPhone 17' build -quiet` passed.
+- `xcodebuild -scheme bumpers -destination 'platform=iOS Simulator,name=iPhone 17' -skip-testing:bumpersUITests test -quiet` passed.
 
 ---
 
