@@ -66,7 +66,18 @@ struct HapticPatternFactoryTests {
 
         #expect(longEvent.type == .continuous)
         #expect(shortEvent.type == .transient)
-        #expect(shortEvent.relativeTime >= longEvent.relativeTime + longEvent.duration + 0.04)
+        #expect(shortEvent.relativeTime >= longEvent.relativeTime + longEvent.duration + 0.09)
+    }
+
+    @Test func fieldMaxStrongLeftRepeatDoesNotSwallowShortTap() throws {
+        let factory = HapticPatternFactory()
+        let pattern = factory.makePattern(.correctLeft(severity: .strong), profile: .fieldMax)
+        let shortEvent = try #require(pattern.events.dropFirst().first)
+        let repeatedLongEvent = try #require(pattern.events.dropFirst(2).first)
+
+        #expect(shortEvent.type == .transient)
+        #expect(repeatedLongEvent.type == .continuous)
+        #expect(repeatedLongEvent.relativeTime >= shortEvent.relativeTime + 0.14)
     }
 
     @Test func arrivalPatternHasSingleCrescendo() {

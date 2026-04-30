@@ -75,7 +75,8 @@ struct HapticPatternFactory {
         case .medium:
             cooldown = 2.2
         case .strong:
-            events += signature(direction: direction, severity: severity, profile: profile, start: 0.38)
+            let repeatStart: TimeInterval = direction == .left ? 0.62 : 0.38
+            events += signature(direction: direction, severity: severity, profile: profile, start: repeatStart)
             cooldown = 1.5
         case .urgent:
             events = [
@@ -95,8 +96,9 @@ struct HapticPatternFactory {
     ) -> [HapticEventSpec] {
         let params = parameters(for: severity)
         let scale = profile.energyScale
-        let longDuration = params.longDuration * profile.continuousDurationScale
-        let followUpGap: TimeInterval = 0.05
+        let leftLongBoost = direction == .left ? 1.12 : 1.0
+        let longDuration = params.longDuration * profile.continuousDurationScale * leftLongBoost
+        let followUpGap: TimeInterval = direction == .left ? 0.10 : 0.05
 
         switch direction {
         case .right:
