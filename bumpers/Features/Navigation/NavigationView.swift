@@ -158,7 +158,7 @@ struct NavigationView: View {
     private var orbCore: some View {
         OrbView(
             zone: viewModel.zone,
-            directionShift: viewModel.directionShift,
+            signal: viewModel.orbSignal,
             bumpTrigger: viewModel.hapticPulseID
         )
         .scaleEffect(1.0 + (glowScale - 1.0) * 0.3) // Subtle core pulse
@@ -221,7 +221,7 @@ struct NavigationView: View {
     }
 
     private var statusChip: some View {
-        Text(viewModel.statusText)
+        Text(statusDisplayText)
             .font(Theme.captionFont)
             .foregroundStyle(statusColor)
             .padding(.horizontal, 12)
@@ -234,7 +234,7 @@ struct NavigationView: View {
                 Capsule()
                     .stroke(statusColor.opacity(0.16), lineWidth: 1)
             )
-            .accessibilityLabel("Navigation status: \(viewModel.statusText)")
+            .accessibilityLabel("Navigation status: \(statusDisplayText)")
     }
 
     // MARK: - Subviews
@@ -296,6 +296,10 @@ struct NavigationView: View {
         }
     }
 
+    private var statusDisplayText: String {
+        viewModel.fieldModeEnabled ? viewModel.fieldDiagnosticsText : viewModel.statusText
+    }
+
     private var orbAccessibilityLabel: String {
         let zone = viewModel.zone
         let direction: String
@@ -340,6 +344,11 @@ struct NavigationView: View {
                 Text("Deviation: \(viewModel.deviation, specifier: "%.1f")°")
                 Text("Zone: \(viewModel.zone.rawValue)")
                 Text("Shift: \(viewModel.directionShift, specifier: "%.2f")")
+                Text("Orb Signal: \(viewModel.orbSignal.shift, specifier: "%.2f")")
+                Text("Profile: \(viewModel.hapticProfile.displayName)")
+                Text("Last Buzz: \(viewModel.lastHapticAge.map { String(format: "%.1fs", $0) } ?? "--")")
+                Text("Cooldown: \(viewModel.currentHapticCooldown, specifier: "%.1f")s")
+                Text("Field Mode: \(viewModel.fieldModeEnabled ? "on" : "off")")
                 Text("State: \(String(describing: viewModel.currentInstruction.state))")
                 Text("Confidence: \(viewModel.currentInstruction.confidence, specifier: "%.2f")")
                 Text("Mode: \(viewModel.mode.rawValue)")

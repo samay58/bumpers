@@ -1,5 +1,11 @@
 import Foundation
 
+enum PreflightHapticCue: Equatable {
+    case right
+    case left
+    case maxBuzz
+}
+
 struct HapticCalibrationFlow {
     enum Step: Int, CaseIterable, Equatable {
         case intro
@@ -17,6 +23,17 @@ struct HapticCalibrationFlow {
     private(set) var leftResult: CalibrationResult?
 
     private let calibrationService = HapticCalibrationService()
+
+    static func preflightPattern(for cue: PreflightHapticCue) -> HapticPatternKind {
+        switch cue {
+        case .right:
+            return .correctRight(severity: .strong)
+        case .left:
+            return .correctLeft(severity: .strong)
+        case .maxBuzz:
+            return .wrongWay(direction: nil)
+        }
+    }
 
     var progressLabel: String {
         switch step {
@@ -77,7 +94,7 @@ struct HapticCalibrationFlow {
 
     mutating func start() -> Transition {
         step = .right
-        return .play(.correctRight(severity: .medium))
+        return .play(Self.preflightPattern(for: .right))
     }
 
     mutating func replay() -> Transition? {
@@ -85,9 +102,9 @@ struct HapticCalibrationFlow {
         case .intro:
             return nil
         case .right:
-            return .play(.correctRight(severity: .medium))
+            return .play(Self.preflightPattern(for: .right))
         case .left:
-            return .play(.correctLeft(severity: .medium))
+            return .play(Self.preflightPattern(for: .left))
         }
     }
 
@@ -98,7 +115,7 @@ struct HapticCalibrationFlow {
         case .right:
             rightResult = result
             step = .left
-            return .play(.correctLeft(severity: .medium))
+            return .play(Self.preflightPattern(for: .left))
         case .left:
             leftResult = result
             let profile = calibrationService.recommendedProfile(

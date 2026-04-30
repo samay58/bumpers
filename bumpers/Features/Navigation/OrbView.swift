@@ -10,7 +10,7 @@ import SwiftUI
 
 struct OrbView: View {
     let zone: TemperatureZone
-    let directionShift: Double
+    let signal: FieldOrbSignal
     let bumpTrigger: Int
 
     var body: some View {
@@ -22,13 +22,20 @@ struct OrbView: View {
             // Subtle highlight (3D glass effect)
             Circle()
                 .fill(highlightGradient)
+
+            if signal.isAlive && !signal.isDirectionalCorrection {
+                Circle()
+                    .stroke(zone.colors.inner.opacity(0.18), lineWidth: 2)
+                    .scaleEffect(1.08)
+                    .blur(radius: 1)
+            }
         }
         .frame(width: Theme.orbSize, height: Theme.orbSize)
         // GPU-optimized rendering
         .drawingGroup()
         // Smooth zone transitions
         .animation(Theme.smoothSpring, value: zone)
-        .animation(Theme.snappySpring, value: directionShift)
+        .animation(Theme.snappySpring, value: signal.shift)
         // Bump animation on haptic
         .orbAnimation(zone: zone, bumpTrigger: bumpTrigger)
     }
@@ -64,7 +71,7 @@ struct OrbView: View {
     // MARK: - Directional Shift
 
     private var gradientCenter: UnitPoint {
-        let clampedShift = max(-1, min(1, directionShift))
+        let clampedShift = max(-1, min(1, signal.shift))
 
         // X shift — moves hotspot left/right based on direction
         let x = 0.5 + (clampedShift * Theme.OrbGradient.shiftX)
@@ -82,8 +89,8 @@ struct OrbView: View {
 
     private var highlightGradient: RadialGradient {
         let offset = Theme.OrbShadow.highlightOffset
-        let highlightX = offset - (directionShift * 0.08)
-        let highlightY = offset + (abs(directionShift) * 0.04)
+        let highlightX = offset - (signal.shift * 0.08)
+        let highlightY = offset + (abs(signal.shift) * 0.04)
 
         return RadialGradient(
             colors: [
@@ -106,18 +113,38 @@ struct OrbView: View {
 
         VStack(spacing: 40) {
             HStack(spacing: 30) {
-                OrbView(zone: .hot, directionShift: 0, bumpTrigger: 0)
+                OrbView(
+                    zone: .hot,
+                    signal: FieldOrbSignal(shift: 0, isAlive: true, isDirectionalCorrection: false),
+                    bumpTrigger: 0
+                )
                     .scaleEffect(0.5)
-                OrbView(zone: .warm, directionShift: 0.3, bumpTrigger: 0)
+                OrbView(
+                    zone: .warm,
+                    signal: FieldOrbSignal(shift: 0.3, isAlive: true, isDirectionalCorrection: false),
+                    bumpTrigger: 0
+                )
                     .scaleEffect(0.5)
             }
             HStack(spacing: 30) {
-                OrbView(zone: .cool, directionShift: -0.5, bumpTrigger: 0)
+                OrbView(
+                    zone: .cool,
+                    signal: FieldOrbSignal(shift: -0.5, isAlive: true, isDirectionalCorrection: true),
+                    bumpTrigger: 0
+                )
                     .scaleEffect(0.5)
-                OrbView(zone: .cold, directionShift: 0.7, bumpTrigger: 0)
+                OrbView(
+                    zone: .cold,
+                    signal: FieldOrbSignal(shift: 0.7, isAlive: true, isDirectionalCorrection: true),
+                    bumpTrigger: 0
+                )
                     .scaleEffect(0.5)
             }
-            OrbView(zone: .freezing, directionShift: -0.9, bumpTrigger: 0)
+            OrbView(
+                zone: .freezing,
+                signal: FieldOrbSignal(shift: -0.9, isAlive: true, isDirectionalCorrection: true),
+                bumpTrigger: 0
+            )
                 .scaleEffect(0.6)
         }
     }
@@ -126,6 +153,10 @@ struct OrbView: View {
 #Preview("Interactive") {
     ZStack {
         Theme.background.ignoresSafeArea()
-        OrbView(zone: .warm, directionShift: 0.5, bumpTrigger: 1)
+        OrbView(
+            zone: .warm,
+            signal: FieldOrbSignal(shift: 0.5, isAlive: true, isDirectionalCorrection: true),
+            bumpTrigger: 1
+        )
     }
 }

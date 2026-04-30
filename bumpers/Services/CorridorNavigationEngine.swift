@@ -9,6 +9,27 @@ struct CorridorNavigationInput {
     let mode: NavigationMode
     let arrivalTime: Date?
     let now: Date
+    let fieldModeEnabled: Bool
+
+    init(
+        currentLocation: CLLocation?,
+        currentHeading: Double?,
+        destination: CLLocationCoordinate2D,
+        corridor: RouteCorridor?,
+        mode: NavigationMode,
+        arrivalTime: Date?,
+        now: Date,
+        fieldModeEnabled: Bool = false
+    ) {
+        self.currentLocation = currentLocation
+        self.currentHeading = currentHeading
+        self.destination = destination
+        self.corridor = corridor
+        self.mode = mode
+        self.arrivalTime = arrivalTime
+        self.now = now
+        self.fieldModeEnabled = fieldModeEnabled
+    }
 }
 
 final class CorridorNavigationEngine {
@@ -106,6 +127,7 @@ final class CorridorNavigationEngine {
             isMakingProgress: trend.distanceDelta <= 8 && trend.progressDelta >= -0.005,
             arrivalSlack: arrivalSlack(input.arrivalTime, routeRemaining: projection.remainingDistanceEstimate)
         )
+        let effectiveWidth = input.fieldModeEnabled ? width * 0.72 : width
 
         if isWrongWay(trend: trend, projection: projection) {
             let direction = correctionDirection(
@@ -125,7 +147,7 @@ final class CorridorNavigationEngine {
             )
         }
 
-        if projection.distanceFromCorridorCenter <= width,
+        if projection.distanceFromCorridorCenter <= effectiveWidth,
            trend.distanceDelta <= 15 || trend.progressDelta >= -0.01 {
             return instruction(
                 state: .inLane,
@@ -144,7 +166,7 @@ final class CorridorNavigationEngine {
             toward: projection.nearestCoordinate,
             currentHeading: heading
         ) ?? correctionDirection(from: location.coordinate, toward: input.destination, currentHeading: heading)
-        let ratio = projection.distanceFromCorridorCenter / max(width, 1)
+        let ratio = projection.distanceFromCorridorCenter / max(effectiveWidth, 1)
 
         if ratio <= 1.75 {
             let severity: Severity = ratio < 1.3 ? .gentle : .medium

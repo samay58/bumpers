@@ -48,6 +48,9 @@ final class NavigationViewModel {
     var isLoadingRoute = false
     var simpleGuidanceMessage: String?
     var hapticProfile: HapticProfile
+    var fieldModeEnabled: Bool
+    var lastHapticFiredAt: Date?
+    var currentHapticCooldown: TimeInterval = 0
 
     // MARK: - Computed Properties
 
@@ -98,6 +101,29 @@ final class NavigationViewModel {
         guard let direction = currentInstruction.correctionDirection else { return 0 }
         let magnitude = max(0.2, min(1, currentInstruction.urgency))
         return direction == .right ? magnitude : -magnitude
+    }
+
+    var orbSignal: FieldOrbSignal {
+        FieldOrbSignal.make(
+            instruction: currentInstruction,
+            deviation: deviation,
+            fieldModeEnabled: fieldModeEnabled
+        )
+    }
+
+    var lastHapticAge: TimeInterval? {
+        guard let lastHapticFiredAt else { return nil }
+        return Date().timeIntervalSince(lastHapticFiredAt)
+    }
+
+    var fieldDiagnosticsText: String {
+        FieldModeDiagnostics.text(
+            instruction: currentInstruction,
+            hapticProfile: hapticProfile,
+            lastHapticAge: lastHapticAge,
+            cooldown: currentHapticCooldown,
+            headingAvailable: hasHeading
+        )
     }
 
     var correctionDirection: CorrectionDirection? {
@@ -223,7 +249,8 @@ final class NavigationViewModel {
         hapticService: HapticService? = nil,
         liveActivityManager: LiveActivityManager? = nil,
         routeService: RouteService? = nil,
-        hapticProfile: HapticProfile = .pocketNormal
+        hapticProfile: HapticProfile = .pocketNormal,
+        fieldModeEnabled: Bool = false
     ) {
         self.destination = destination
         self.arrivalTime = arrivalTime
@@ -233,6 +260,7 @@ final class NavigationViewModel {
         self.liveActivityManager = liveActivityManager ?? LiveActivityManager()
         self.routeService = routeService ?? RouteService()
         self.hapticProfile = hapticProfile
+        self.fieldModeEnabled = fieldModeEnabled
     }
 
     deinit {
@@ -251,6 +279,9 @@ final class NavigationViewModel {
         startTime = Date()
         totalDistance = 0
         previousLocation = nil
+        lastHapticTime = nil
+        lastHapticFiredAt = nil
+        currentHapticCooldown = 0
         hapticPulseID = 0
         routeCorridor = nil
         simpleGuidanceMessage = nil
@@ -345,7 +376,8 @@ final class NavigationViewModel {
                 corridor: routeCorridor,
                 mode: mode,
                 arrivalTime: arrivalTime,
-                now: Date()
+                now: Date(),
+                fieldModeEnabled: fieldModeEnabled
             )
         )
         simpleGuidanceMessage = currentInstruction.usesSimpleGuidance ? "Using simple direction guidance" : nil
@@ -397,6 +429,7 @@ final class NavigationViewModel {
         // Check if enough time has passed since last haptic
         let pattern = hapticPatternFactory.makePattern(kind, profile: hapticProfile)
         let interval = pattern.cooldown
+        currentHapticCooldown = interval
         if let lastTime = lastHapticTime {
             guard now.timeIntervalSince(lastTime) >= interval else { return }
         }
@@ -404,6 +437,7 @@ final class NavigationViewModel {
         hapticService.play(kind, profile: hapticProfile)
 
         lastHapticTime = now
+        lastHapticFiredAt = now
         hapticPulseID += 1
     }
 

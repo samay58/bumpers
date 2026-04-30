@@ -25,8 +25,11 @@ Before each real walk:
 
 - Build the current branch onto a real iPhone.
 - Enable location permission.
-- Run haptic calibration with the phone in the exact place you plan to carry it.
-- Start with `pocketNormal`; switch to `pocketMax` if either side is unclear.
+- Use Field Mode unless intentionally comparing against Product Mode.
+- Keep haptic profile on `Field Max` for the first validation walk.
+- Before starting, tap `Test left`, `Test right`, and `Max buzz` with the phone in the real carrying pocket.
+- If either direction is unclear, tap `Too weak`, replay `Max buzz`, and record the phone placement as a failure if it still cannot be felt.
+- Start walking only after left and right are distinguishable.
 - Confirm the selected navigation mode:
   - Direct: keep me close
   - Room to wander: give me space
@@ -39,7 +42,7 @@ Record:
 | Date/time | |
 | Route | |
 | Phone placement | front pocket / jacket pocket / loose pants / handheld |
-| Haptic profile | pocketNormal / pocketMax / handheld / quiet |
+| Haptic profile | fieldMax / pocketMax / pocketNormal / handheld / quiet |
 | Navigation mode | direct / roomToWander / scenic |
 | Weather / street noise | |
 | Battery before / after | |
@@ -67,7 +70,8 @@ Simulator pass criteria:
 - Search results use nearby context when simulated location is available.
 - Wander sheet never shows a fake 15-minute estimate.
 - Mode picker works.
-- First-run calibration advances reliably, can be skipped, and drops back into the wander setup without reopening.
+- Field preflight controls are visible before starting navigation.
+- First-run calibration still advances reliably when Field Mode is disabled, can be skipped, and drops back into the wander setup without reopening.
 - Navigation screen shows mode, current status (`In lane`, `GPS uncertain`, `Simple direction guidance`, etc.), confidence/debug state, and simple-guidance fallback when routing fails.
 - Unit tests pass.
 
@@ -244,6 +248,7 @@ Continue iPhone-only V2 only if these are true after real walks:
 
 - In a front pocket, strong correction haptics are reliably noticeable while walking.
 - Left vs right is identifiable within one calibration session.
+- In Field Mode, the user can tell within 60 seconds whether route, heading, and haptics are live.
 - On a 15-minute city walk, false nudges are rare enough that trust increases over time.
 - Search and ETA feel native-quality.
 - The app feels calmer and more useful than opening Apple Maps for exploratory walking.

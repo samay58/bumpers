@@ -1,6 +1,6 @@
 # Bumper — Implementation Plan
 
-*Last updated: 2026-04-27*
+*Last updated: 2026-04-30*
 
 ---
 
@@ -42,7 +42,7 @@ This document tracks implementation progress. Check boxes indicate completion.
   - [x] Engine lifecycle (restart on foreground)
   - [x] Fallback to UIImpactFeedbackGenerator
   - [x] Pattern playback from `HapticPatternFactory`
-  - [x] Profile-aware playback (`pocketMax`, `pocketNormal`, `handheld`, `quiet`)
+  - [x] Profile-aware playback (`fieldMax`, `pocketMax`, `pocketNormal`, `handheld`, `quiet`)
   - [x] Arrival pattern playback
 
 ### Models Layer
@@ -225,6 +225,7 @@ This document tracks implementation progress. Check boxes indicate completion.
 
 - [x] Launch screen (dark background, matches Theme.background)
 - [x] App icon (fire/wave yin-yang design)
+- [x] Remove faint Home Screen app icon edge rim
 - [x] Custom typography (Quicksand — warm, rounded geometric sans-serif)
 - [x] Smooth view transitions (staggered animations in ArrivalView)
 - [x] Accessibility labels (NavigationView, ArrivalView)
@@ -297,12 +298,21 @@ This document tracks implementation progress. Check boxes indicate completion.
 
 ### Pocket-First Haptics
 
-- [x] Add `HapticProfile` with pocketMax, pocketNormal, handheld, quiet
+- [x] Add `HapticProfile` with fieldMax, pocketMax, pocketNormal, handheld, quiet
 - [x] Add inspectable `HapticPatternFactory`
 - [x] Replace intensity-ramp direction language with duration rhythm
 - [x] Add skippable first-run haptic calibration
 - [x] Remove double arrival haptic playback
 - [x] Keep on-track mostly silent
+
+### Field Mode Validation
+
+- [x] Add Field Max haptic profile for real-pocket validation
+- [x] Add one-screen haptic preflight with left, right, and max buzz
+- [x] Make Field Mode the default validation posture
+- [x] Make in-lane navigation visibly alive without constant buzzing
+- [x] Add Field Mode diagnostics for route state, profile, last buzz, and cooldown
+- [ ] Real-device Field Mode walk test passes pocket viability gate
 
 ### Visual Refresh
 
@@ -320,8 +330,8 @@ This document tracks implementation progress. Check boxes indicate completion.
 - [x] Add unit tests for sign convention, route projection, corridor states, stale search suppression, ETA labels, and haptic pattern shape
 - [x] Direct Swift typecheck passes for app Swift files
 - [x] Fold simulator-install dependency into validation plan
-- [ ] Xcode build passes after local iOS simulator/runtime install finishes
-- [ ] Unit tests pass on concrete simulator
+- [x] Xcode build passes after local iOS simulator/runtime install finishes
+- [x] Unit tests pass on concrete simulator
 - [ ] Real-device walk tests pass the V2 gate
 
 ---

@@ -13,7 +13,8 @@ struct WanderDialSheet: View {
     let locationService: LocationService
 
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("hapticProfile") private var hapticProfileRawValue = HapticProfile.pocketNormal.rawValue
+    @AppStorage("hapticProfile") private var hapticProfileRawValue = FieldModeSettings.validationDefault.hapticProfile.rawValue
+    @AppStorage("fieldModeEnabled") private var fieldModeEnabled = FieldModeSettings.validationDefault.isEnabled
     @AppStorage("hasSeenHapticCalibration") private var hasSeenHapticCalibration = false
     @State private var wanderMinutes: Double = 60 // Start at "no rush" position
     @State private var showNavigation = false
@@ -104,6 +105,11 @@ struct WanderDialSheet: View {
                 .opacity(isTransitioning ? 0 : 1)
 
             NavigationModePicker(selectedMode: $selectedMode)
+                .padding(.horizontal, Theme.Spacing.xxl)
+                .padding(.bottom, Theme.Spacing.xl)
+                .opacity(isTransitioning ? 0 : 1)
+
+            preflightHapticPanel
                 .padding(.horizontal, Theme.Spacing.xxl)
                 .padding(.bottom, Theme.Spacing.xl)
                 .opacity(isTransitioning ? 0 : 1)
@@ -241,6 +247,56 @@ struct WanderDialSheet: View {
         .animation(.easeOut(duration: 0.2), value: wanderMinutes)
     }
 
+    private var preflightHapticPanel: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Field haptics")
+                        .font(Theme.captionFont)
+                        .foregroundStyle(Theme.textSecondary)
+
+                    Text(hapticProfile.displayName)
+                        .font(Theme.labelFont)
+                        .foregroundStyle(Theme.textTertiary)
+                }
+
+                Spacer()
+
+                Button("Too weak") {
+                    hapticProfileRawValue = HapticProfile.fieldMax.rawValue
+                    playPreflightCue(.maxBuzz)
+                }
+                .font(Theme.labelFont)
+                .foregroundStyle(Theme.warm.inner)
+            }
+
+            HStack(spacing: Theme.Spacing.sm) {
+                preflightButton("Test left", cue: .left)
+                preflightButton("Test right", cue: .right)
+                preflightButton("Max buzz", cue: .maxBuzz)
+            }
+        }
+        .padding(Theme.Spacing.md)
+        .background(Theme.surfaceSubtle)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                .stroke(Theme.borderSubtle, lineWidth: 1)
+        )
+    }
+
+    private func preflightButton(_ title: String, cue: PreflightHapticCue) -> some View {
+        Button(title) {
+            playPreflightCue(cue)
+        }
+        .font(Theme.labelFont)
+        .foregroundStyle(Theme.textSecondary)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(Theme.surfaceElevated)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.sm))
+    }
+
     /// True when wander time is less than 5 minutes (very tight schedule)
     private var isTightSchedule: Bool {
         !isNoRush && wanderMinutes < 5
@@ -339,7 +395,7 @@ struct WanderDialSheet: View {
     private func initializeStageIfNeeded() {
         guard !hasInitializedStage else { return }
         hasInitializedStage = true
-        sheetStage = hasSeenHapticCalibration ? .planning : .calibration
+        sheetStage = (fieldModeEnabled || hasSeenHapticCalibration) ? .planning : .calibration
         calibrationHapticService.prepare()
     }
 
@@ -353,6 +409,14 @@ struct WanderDialSheet: View {
         case .complete(let profile):
             finishCalibration(with: profile)
         }
+    }
+
+    private func playPreflightCue(_ cue: PreflightHapticCue) {
+        calibrationHapticService.prepare()
+        calibrationHapticService.play(
+            HapticCalibrationFlow.preflightPattern(for: cue),
+            profile: hapticProfile
+        )
     }
 
     private func finishCalibration(with profile: HapticProfile?) {
@@ -435,7 +499,8 @@ struct WanderDialSheet: View {
             arrivalTime: arrivalTime,
             mode: selectedMode,
             locationService: locationService,
-            hapticProfile: hapticProfile
+            hapticProfile: hapticProfile,
+            fieldModeEnabled: fieldModeEnabled
         )
     }
 }

@@ -79,6 +79,47 @@ struct V2NavigationTests {
         #expect(instruction.hapticPattern == .correctRight(severity: instruction.severity))
     }
 
+    @Test func fieldModeTightensCorridorForEarlierDrift() {
+        let start = CLLocationCoordinate2D(latitude: 0, longitude: 0)
+        let end = CLLocationCoordinate2D(latitude: 0, longitude: 0.01)
+        let corridor = RouteCorridor(routes: [makeRoute(start, end)], mode: .direct, destination: end)
+        let normalEngine = CorridorNavigationEngine()
+        let fieldEngine = CorridorNavigationEngine()
+        let location = makeLocation(latitude: 0.00034, longitude: 0.005, accuracy: 8, speed: 1.2)
+
+        let normal = normalEngine.instruction(
+            for: CorridorNavigationInput(
+                currentLocation: location,
+                currentHeading: 90,
+                destination: end,
+                corridor: corridor,
+                mode: .direct,
+                arrivalTime: nil,
+                now: Date(timeIntervalSince1970: 100)
+            )
+        )
+
+        let field = fieldEngine.instruction(
+            for: CorridorNavigationInput(
+                currentLocation: location,
+                currentHeading: 90,
+                destination: end,
+                corridor: corridor,
+                mode: .direct,
+                arrivalTime: nil,
+                now: Date(timeIntervalSince1970: 100),
+                fieldModeEnabled: true
+            )
+        )
+
+        #expect(normal.state == .inLane)
+        if case .drifting = field.state {
+            #expect(field.hapticPattern != .none)
+        } else {
+            Issue.record("Expected field mode drift, got \(field.state)")
+        }
+    }
+
     @Test func lowLocationConfidenceSuppressesDirectionalHaptics() {
         let start = CLLocationCoordinate2D(latitude: 0, longitude: 0)
         let end = CLLocationCoordinate2D(latitude: 0, longitude: 0.01)
