@@ -248,15 +248,22 @@ struct WanderDialSheet: View {
     }
 
     private var preflightHapticPanel: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+        VStack(spacing: Theme.Spacing.md) {
             HStack {
-                Text("Pocket check")
-                    .font(Theme.labelFont)
-                    .foregroundStyle(Theme.textSecondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Field haptics")
+                        .font(Theme.captionFont)
+                        .foregroundStyle(Theme.textSecondary)
+
+                    Text(hapticProfile.displayName)
+                        .font(Theme.labelFont)
+                        .foregroundStyle(Theme.textTertiary)
+                }
 
                 Spacer()
 
-                Button("Replay max") {
+                Button("Too weak") {
+                    hapticProfileRawValue = HapticProfile.fieldMax.rawValue
                     playPreflightCue(.maxBuzz)
                 }
                 .font(Theme.labelFont)
