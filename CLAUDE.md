@@ -41,12 +41,12 @@ Don't skip layers. Views talk to ViewModels, not directly to Services.
 
 **Services layer** — stateless calculators and system wrappers:
 - `NavigationCalculator` — Haversine bearing, deviation, distance, arrival detection (50m radius), wander budget. All static methods.
-- `LocationService` — `@Observable` CLLocationManager wrapper. Three update modes (precise/balanced/efficient) for battery optimization. Heading falls back from compass to GPS course.
+- `LocationService` — `@Observable` CLLocationManager wrapper. Three update modes (precise/balanced/efficient) for battery optimization. Active navigation can allow background location so Lock Screen Live Activity state stays fresh while the phone is locked. Heading falls back from compass to GPS course.
 - `RouteService` — MapKit walking directions wrapper. Requests alternate walking routes and returns route geometry plus ETA/distance metadata.
 - `RouteCorridor` / `CorridorNavigationEngine` — Projects the user onto the route corridor, tracks progress, classifies confidence and drift, and emits `CorrectionInstruction`.
 - `DestinationSearchService` — Location-aware MapKit search/completer service with stale-result suppression through `DestinationSearchViewModel`.
 - `HapticPatternFactory` / `HapticService` — Pocket-first duration-rhythm haptic patterns with Core Haptics playback and UIKit fallback.
-- `LiveActivityManager` — ActivityKit lifecycle for Lock Screen + Dynamic Island. Local updates only (no push).
+- `LiveActivityManager` — ActivityKit lifecycle for Lock Screen + Dynamic Island. Local updates only (no push), coalesced by meaningful visible state changes.
 
 **Navigation flow:** `HomeView` (search) -> `WanderDialSheet` (time + looseness + calibration) -> `NavigationView` (corridor guidance) -> `ArrivalView` (stats)
 
@@ -99,7 +99,7 @@ Haptic language:
 
 | Decision | Rationale |
 |----------|-----------|
-| Foreground-only (no background mode) | Haptics require foreground. Screen stays on via `isIdleTimerDisabled`. |
+| Active-navigation background location | Lock Screen Live Activity updates need fresh location while the phone is locked. Haptics still require foreground validation, and screen-on walking remains the primary iPhone haptic path. |
 | Route-aware soft corridor | Preserves wandering while avoiding stupid crow-flies nudges through buildings and street-grid constraints. |
 | Crow-flies fallback | Honest degradation when MapKit routing fails. UI shows "Using simple direction guidance." |
 | Pocket-first haptics | Duration rhythm survives clothing better than subtle intensity ramps. |

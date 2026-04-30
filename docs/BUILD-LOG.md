@@ -1206,6 +1206,33 @@ Ran a post-merge hygiene pass over Field Mode, navigation UI, tests, and docs.
 
 ---
 
+## Session 20: Live Activity Quality Pass
+
+**Date:** 2026-04-30
+**Duration:** Implementation pass
+**Phase:** 6 (Route-Aware V2) - Live Activity validation hardening
+
+### Issue
+
+The Lock Screen Live Activity and Dynamic Island looked visually heavy but under-informative. They only received temperature zone plus distance, so they could not explain V2 states like `In lane`, `GPS uncertain`, `Simple direction guidance`, or left/right corrections. The host app also pushed updates on every 0.5s navigation tick, which made the update contract noisy without making the widget more trustworthy.
+
+### Key Updates
+
+- Expanded `NavigationActivityAttributes.ContentState` with status, action, direction, guidance mode, confidence, update time, distance availability, and distance/confidence buckets.
+- Reworked `LiveActivityManager` to send updates only when visible state changes, distance crosses a useful bucket, confidence changes meaningfully, or a heartbeat is needed.
+- Replaced the blob/glow-heavy widget layout with a calmer Lock Screen and Dynamic Island hierarchy: signal mark, concise status, action hint, destination, and distance remaining.
+- Mapped `NavigationViewModel` corridor states into honest Live Activity copy, including quiet in-lane state, low-confidence suppression, simple-guidance fallback, wrong-way state, and arrived state.
+- Added active-navigation background location configuration so Lock Screen updates can keep receiving location while the phone is locked, subject to system permission.
+- Added unit coverage for the Live Activity state defaults, distance/confidence buckets, no-fake-zero distance display, and low-confidence/direction display helpers.
+
+### Verification
+
+- `xcodebuild -scheme bumpers -destination 'platform=iOS Simulator,name=iPhone 17' build` passed.
+- `xcodebuild -scheme bumpers -destination 'platform=iOS Simulator,name=iPhone 17' -skip-testing:bumpersUITests test -quiet` passed.
+- Real-device Live Activity testing remains required, especially Dynamic Island compact/expanded rendering and locked-phone freshness.
+
+---
+
 ## Index of Decisions (Updated)
 
 | Topic | Decision | Session |
@@ -1219,7 +1246,8 @@ Ran a post-merge hygiene pass over Field Mode, navigation UI, tests, and docs.
 | Arrival detection | Dynamic radius with 3s dwell; heading not required | 15 |
 | Widget typography | Semibold/bold weights | 14 |
 | Widget aura effects | Radial gradients + blur glows | 14 |
-| Live Activity | Lock Screen + Dynamic Island, foreground-only | 13 |
+| Live Activity | Rich Lock Screen + Dynamic Island state with active-navigation background freshness | 20 |
+| Live Activity MVP | Lock Screen + Dynamic Island, foreground-only | 13 |
 | App icon | Fire/wave yin-yang design | 12 |
 | Micro-interactions | Pressable modifiers, haptic ticks, hero transition | 11 |
 | Journey Trail | Colored path map + wander factor on arrival | 10 |

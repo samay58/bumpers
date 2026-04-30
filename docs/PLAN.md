@@ -251,6 +251,10 @@ This document tracks implementation progress. Check boxes indicate completion.
 - [x] Aura-like gradients (radial glow, blur effects) — Session 14
 - [x] Bolder typography (semibold/bold weights) — Session 14
 - [x] Widget compile sources fixed — Session 14
+- [x] Rich Live Activity state for status, action, direction, confidence, and guidance mode
+- [x] Meaningful-change Live Activity update cadence instead of timer-tick spam
+- [x] Warmer minimal Lock Screen and Dynamic Island hierarchy
+- [x] Active-navigation background location path for fresher Lock Screen updates
 - [ ] ⚠️ **Device testing required** — Verify Live Activity appears on real device
 
 ### Testing
@@ -265,7 +269,7 @@ This document tracks implementation progress. Check boxes indicate completion.
 ### Documentation
 
 - [x] Update CLAUDE.md with Live Activity architecture
-- [x] BUILD-LOG entries for sessions 11-14
+- [x] BUILD-LOG entries for Live Activity and V2 sessions
 - [ ] Archive any abandoned ideas
 
 ---

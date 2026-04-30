@@ -306,7 +306,7 @@ final class NavigationViewModel {
 
         // Start services
         hapticService.prepare()
-        locationService.startUpdating()
+        locationService.startUpdating(allowsBackgroundUpdates: true)
         if let currentLocation {
             loadRoute(from: currentLocation)
         }
@@ -314,8 +314,7 @@ final class NavigationViewModel {
         // Start Live Activity (Lock Screen + Dynamic Island)
         liveActivityManager.startNavigation(
             destinationName: destination.name,
-            zone: zone,
-            distance: distance
+            initialState: liveActivityContentState()
         )
 
         // Start haptic timer
@@ -386,8 +385,8 @@ final class NavigationViewModel {
         // Sample journey point for trail visualization
         sampleJourneyPointIfNeeded()
 
-        // Update Live Activity with current state
-        liveActivityManager.updateNavigation(zone: currentInstruction.visualTemperature, distance: distance)
+        // Update Live Activity with user-facing state.
+        liveActivityManager.updateNavigation(liveActivityContentState())
 
         // Optimize battery based on navigation state
         updateLocationMode()
@@ -454,6 +453,84 @@ final class NavigationViewModel {
         // Stop haptic timer but keep stats available for ArrivalView
         hapticTimer?.invalidate()
         hapticTimer = nil
+    }
+
+    // MARK: - Live Activity
+
+    private func liveActivityContentState() -> NavigationActivityAttributes.ContentState {
+        NavigationActivityAttributes.ContentState(
+            zone: currentInstruction.visualTemperature.rawValue,
+            distanceMeters: distance,
+            distanceAvailable: currentCoordinate != nil,
+            status: liveActivityStatusText,
+            action: liveActivityActionText,
+            direction: liveActivityDirection,
+            guidanceMode: liveActivityGuidanceMode,
+            confidence: currentInstruction.confidence
+        )
+    }
+
+    private var liveActivityStatusText: String {
+        switch currentInstruction.state {
+        case .drifting(let direction, _):
+            return "Ease \(direction.label)"
+        case .offCourse(let direction, _):
+            return "Correct \(direction.label)"
+        case .simpleGuidance(let direction, _):
+            if let direction {
+                return "Broad \(direction.label)"
+            }
+            return "Simple guidance"
+        default:
+            return statusText
+        }
+    }
+
+    private var liveActivityActionText: String {
+        switch currentInstruction.state {
+        case .acquiringLocation:
+            return "Getting oriented"
+        case .lowConfidence(.poorLocationAccuracy):
+            return "No directional buzz until GPS improves"
+        case .lowConfidence(.headingUnavailable):
+            return locationService.headingAvailable ? "Calibrating compass" : "Start walking for direction"
+        case .lowConfidence(.locationUnavailable):
+            return "Waiting for a location fix"
+        case .inLane:
+            return "Quiet means on track"
+        case .drifting:
+            return "Small correction"
+        case .offCourse:
+            return "Take the next useful turn"
+        case .wrongWay(let direction):
+            if let direction {
+                return "Turn \(direction.label) when safe"
+            }
+            return "Turn back toward the route"
+        case .arrived:
+            return "You made it"
+        case .simpleGuidance:
+            return "Route unavailable, using bearing"
+        }
+    }
+
+    private var liveActivityDirection: String? {
+        currentInstruction.correctionDirection?.label
+    }
+
+    private var liveActivityGuidanceMode: String {
+        switch currentInstruction.state {
+        case .acquiringLocation:
+            return "acquiring"
+        case .lowConfidence:
+            return "lowConfidence"
+        case .arrived:
+            return "arrived"
+        case .simpleGuidance:
+            return "simple"
+        default:
+            return currentInstruction.usesSimpleGuidance ? "simple" : "route"
+        }
     }
 
     // MARK: - Journey Sampling

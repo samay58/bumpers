@@ -86,6 +86,7 @@ final class LocationService: NSObject {
     // MARK: - Private
 
     private let locationManager = CLLocationManager()
+    private var wantsBackgroundUpdates = false
 
     // MARK: - Initialization
 
@@ -106,10 +107,19 @@ final class LocationService: NSObject {
         locationManager.requestWhenInUseAuthorization()
     }
 
-    func startUpdating() {
+    func startUpdating(allowsBackgroundUpdates: Bool = false) {
+        wantsBackgroundUpdates = allowsBackgroundUpdates
+
         guard isAuthorized else {
             requestPermission()
             return
+        }
+
+        locationManager.allowsBackgroundLocationUpdates = allowsBackgroundUpdates
+        locationManager.pausesLocationUpdatesAutomatically = !allowsBackgroundUpdates
+
+        if allowsBackgroundUpdates, authorizationStatus == .authorizedWhenInUse {
+            locationManager.requestAlwaysAuthorization()
         }
 
         locationManager.startUpdatingLocation()
@@ -120,6 +130,9 @@ final class LocationService: NSObject {
     }
 
     func stopUpdating() {
+        wantsBackgroundUpdates = false
+        locationManager.allowsBackgroundLocationUpdates = false
+        locationManager.pausesLocationUpdatesAutomatically = true
         locationManager.stopUpdatingLocation()
         locationManager.stopUpdatingHeading()
     }
@@ -184,7 +197,7 @@ extension LocationService: CLLocationManagerDelegate {
 
         // Auto-start if we just got permission
         if isAuthorized {
-            startUpdating()
+            startUpdating(allowsBackgroundUpdates: wantsBackgroundUpdates)
         }
     }
 
