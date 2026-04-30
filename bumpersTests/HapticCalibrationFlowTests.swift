@@ -9,7 +9,7 @@ struct HapticCalibrationFlowTests {
         let transition = flow.start()
 
         #expect(flow.step == .right)
-        #expect(transition == .play(.correctRight(severity: .medium)))
+        #expect(transition == .play(.correctRight(severity: .strong)))
         #expect(flow.showsResponseButtons)
     }
 
@@ -21,7 +21,7 @@ struct HapticCalibrationFlowTests {
 
         #expect(flow.step == .left)
         #expect(flow.rightResult == .clear)
-        #expect(transition == .play(.correctLeft(severity: .medium)))
+        #expect(transition == .play(.correctLeft(severity: .strong)))
     }
 
     @Test func finalResponseCompletesWithRecommendedProfile() {
@@ -40,9 +40,15 @@ struct HapticCalibrationFlowTests {
         #expect(flow.replay() == nil)
 
         _ = flow.start()
-        #expect(flow.replay() == .play(.correctRight(severity: .medium)))
+        #expect(flow.replay() == .play(.correctRight(severity: .strong)))
 
         _ = flow.record(.clear)
-        #expect(flow.replay() == .play(.correctLeft(severity: .medium)))
+        #expect(flow.replay() == .play(.correctLeft(severity: .strong)))
+    }
+
+    @Test func preflightCueMappingUsesFieldStrengthPatterns() {
+        #expect(HapticCalibrationFlow.preflightPattern(for: .right) == .correctRight(severity: .strong))
+        #expect(HapticCalibrationFlow.preflightPattern(for: .left) == .correctLeft(severity: .strong))
+        #expect(HapticCalibrationFlow.preflightPattern(for: .maxBuzz) == .wrongWay(direction: nil))
     }
 }
