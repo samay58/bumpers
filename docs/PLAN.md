@@ -225,6 +225,7 @@ This document tracks implementation progress. Check boxes indicate completion.
 
 - [x] Launch screen (dark background, matches Theme.background)
 - [x] App icon (fire/wave yin-yang design)
+- [x] Remove faint Home Screen app icon edge rim
 - [x] Custom typography (Quicksand — warm, rounded geometric sans-serif)
 - [x] Smooth view transitions (staggered animations in ArrivalView)
 - [x] Accessibility labels (NavigationView, ArrivalView)
