@@ -1,131 +1,129 @@
-# Bumper — Agent Instructions
+# Bumper - Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+## Current Project State
 
----
+Bumper is an iOS 17+ SwiftUI walking app for wandering toward a destination without staring at turn-by-turn directions. It uses MapKit walking routes internally to create a loose corridor, then gives pocket-first haptic corrections only when the user drifts meaningfully away, starts making bad progress, or needs urgent guidance.
 
-## Project Context
+As of 2026-04-30, the Phase 6 route-aware V2 prototype is implemented. The live work is validation, not broad new feature work:
 
-**Bumper** is an iOS navigation app that uses haptic feedback instead of turn-by-turn directions. The core philosophy is helping a user wander toward a destination without staring at a route.
+- `bumper-dva.5` - Device walk testing and V2 validation
+- `bumper-dva.7` - Clarify and validate rotation/orb behavior on physical device
+- `bumper-dva.2` - Live Activity device validation
 
-**Current Status:** Phase 6 Route-Aware V2 prototype is implemented and awaiting simulator/device validation. See `docs/PLAN.md` for details.
+Treat `docs/PLAN.md` as the progress ledger, `docs/SPEC.md` as the product contract, `CLAUDE.md` as the architecture guide, and `docs/BUILD-LOG.md` as the decision history.
 
----
-
-## Quick Reference
+## Start Here
 
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
+bd prime
+bd ready
+git status --short --branch
 ```
 
----
+Before changing code or docs:
 
-## Before Making Changes
+1. Read `docs/PLAN.md` for current phase and remaining gates.
+2. Read `CLAUDE.md` for architecture, build commands, and Swift rules.
+3. Read `docs/BUILD-LOG.md` when touching behavior with history.
+4. Read `docs/WALK-TESTS.md` before navigation, haptic, Live Activity, or device-validation work.
+5. Use beads for task tracking. Create or claim an issue before implementation work.
 
-1. **Read `docs/PLAN.md`** to understand what's built and what's next
-2. **Read `docs/SPEC.md`** for the full specification
-3. **Check `CLAUDE.md`** for architecture and design decisions
-4. **Run `bd ready`** to see if there are existing issues related to your work
+## Issue Tracking
 
----
+This project uses `bd` (beads). `bd prime` is the up-to-date workflow context; keep `AGENTS.md` lean and let beads provide dynamic details.
 
-## Making Changes
+Useful commands:
 
-### Adding Features
+```bash
+bd ready
+bd show <id>
+bd create --title "Title" --type task --priority 2
+bd update <id> --status in_progress
+bd close <id> --reason "Done"
+bd sync
+```
 
-1. Check if it's in `docs/PLAN.md` — if so, mark it in_progress
-2. Follow the existing architecture (Services → Models → Features)
-3. Update `docs/PLAN.md` when complete
-4. Add to `docs/BUILD-LOG.md` with learnings
+Do not use blocking editor flows such as `bd edit`.
 
-### Modifying Existing Code
+## Architecture Rules
 
-1. Understand *why* the current code exists (check `docs/BUILD-LOG.md`)
-2. If changing a design decision, document the change and rationale
-3. Run the build to verify: `xcodebuild -scheme bumpers build`
+Follow the existing layers:
 
-### Subtracting/Removing Features
+```text
+Services -> Models -> ViewModels -> Views
+```
 
-1. Document what's being removed and why in `docs/BUILD-LOG.md`
-2. Update `docs/PLAN.md` to reflect the change
-3. If removing for simplification, note what it replaced
+- Views talk to ViewModels, not directly to Services.
+- `NavigationViewModel` orchestrates route loading, rerouting, haptic cooldown, journey sampling, arrival, and Live Activity updates.
+- Corridor decisions belong in `CorridorNavigationEngine` and related model/service types.
+- `Theme.swift` is the design-system source for colors, typography, spacing, animation, and orb constants.
+- `HapticPatternFactory` owns haptic timing and pattern vocabulary.
+- `NavigationActivityAttributes` must stay target-safe and Codable for ActivityKit.
+- Never directly edit `.pbxproj`; use Xcode/XcodeBuildMCP-style project operations when target membership changes.
 
----
+## Product Contracts To Preserve
 
-## Code Style
+- No blue route line or turn-by-turn UI during active navigation.
+- Route-aware corridor guidance is primary; crow-flies bearing is fallback only.
+- If MapKit routing is unavailable, the UI labels simple guidance honestly.
+- In-lane/on-track is mostly silent. Silence is success, not a bug.
+- The orb is correction-driven in V2. Stationary rotation may not move it while the user remains `In lane`.
+- Positive deviation means correct right; negative deviation means correct left.
+- Low-confidence location or heading suppresses directional haptics.
+- Arrival requires location dwell near destination, not heading correctness.
+- If front-pocket haptics fail real walks, consider the Apple Watch/wearable pivot instead of polishing iPhone-only UX.
 
-- **SwiftUI views** — Struct-based, use `@State` and `@Observable`
-- **Services** — Classes, handle lifecycle, can be shared
-- **Models** — Structs or SwiftData `@Model` classes
-- **File naming** — Match the main type (e.g., `HapticService.swift` contains `HapticService`)
+## Build And Test
 
----
+Preferred simulator gate:
 
-## Testing Requirements
+```bash
+xcodebuild -scheme bumpers -destination 'platform=iOS Simulator,name=iPhone 17' build
+xcodebuild -scheme bumpers -destination 'platform=iOS Simulator,name=iPhone 17' -skip-testing:bumpersUITests test -quiet
+```
 
-**Before marking work complete:**
+If `iPhone 17` is unavailable:
 
-1. Build passes: `xcodebuild -scheme bumpers build`
-2. No new warnings (strive for)
-3. If touching navigation logic, walk-test on device if possible
+```bash
+xcrun simctl list devices available
+```
 
----
+Use a concrete installed simulator. UI tests can hang; only run them intentionally.
 
-## Landing the Plane (Session Completion)
+Simulator validation is not product validation. Haptics, compass behavior, pocket legibility, and Live Activity behavior need real-device testing. Use `docs/WALK-TESTS.md` for the V2 field-test matrix.
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+## Documentation Discipline
 
-**MANDATORY WORKFLOW:**
+When changing behavior:
 
-1. **Update docs** — Reflect changes in `docs/PLAN.md` and `docs/BUILD-LOG.md`
-2. **File issues for remaining work** — Create issues for anything that needs follow-up
-3. **Run quality gates** — `xcodebuild -scheme bumpers build`
-4. **Update issue status** — Close finished work, update in-progress items
-5. **PUSH TO REMOTE** — This is MANDATORY:
-   ```bash
-   git add .
-   git commit -m "Description of changes"
-   bd sync
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-6. **Verify** — All changes committed AND pushed
-7. **Hand off** — Update `docs/BUILD-LOG.md` with session summary
+- Update `docs/PLAN.md` if progress, status, or checkboxes changed.
+- Update `docs/BUILD-LOG.md` with the decision, rationale, and verification.
+- Update `docs/SPEC.md` only when the product contract changes.
+- File follow-up beads for real remaining work instead of burying it in prose.
 
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing — that leaves work stranded locally
-- NEVER say "ready to push when you are" — YOU must push
-- If push fails, resolve and retry until it succeeds
+When only refreshing agent/process docs, keep product docs unchanged unless the product state itself changed.
 
----
+## Session Close
+
+Work is not complete until the relevant changes are committed and pushed. Before saying done:
+
+1. Run `git status --short --branch`.
+2. Close or update the relevant bead issue.
+3. Stage only files that belong to your work; do not sweep unrelated untracked artifacts into the commit.
+4. Run the appropriate build/test gate, or clearly record why it was not applicable.
+5. Run `bd sync`.
+6. Commit.
+7. Run `bd sync` again if beads changed.
+8. `git push`.
+9. Confirm `git status --short --branch` is clean or only contains pre-existing unrelated local files.
 
 ## Key Files
 
 | File | Purpose |
-|------|---------|
-| `CLAUDE.md` | Project-specific Claude instructions |
-| `docs/SPEC.md` | Full specification |
-| `docs/PLAN.md` | Implementation phases with checkboxes |
-| `docs/ROADMAP.md` | Future ideas and enhancements |
-| `docs/BUILD-LOG.md` | Session history and learnings |
-
----
-
-## Architecture at a Glance
-
-```
-Services (pure logic)
-    ↓
-Models (data structures)
-    ↓
-ViewModels (business logic + state)
-    ↓
-Views (UI)
-```
-
-Don't skip layers. A view should talk to its ViewModel, not directly to a Service.
+| --- | --- |
+| `CLAUDE.md` | Architecture, build/test commands, Swift rules |
+| `docs/SPEC.md` | Product and behavior specification |
+| `docs/PLAN.md` | Current implementation phase and checklist |
+| `docs/WALK-TESTS.md` | V2 simulator and real-device validation protocol |
+| `docs/BUILD-LOG.md` | Session history, rationale, learnings |
+| `docs/ROADMAP.md` | Future ideas and pivots |

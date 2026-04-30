@@ -1126,6 +1126,35 @@ Separately, the navigation screen relied on the orb alone to communicate state. 
 
 ---
 
+## Session 17: Agent Instructions Refresh
+
+**Date:** 2026-04-30
+**Duration:** Short documentation pass
+**Phase:** 6 (Route-Aware V2) — Process/documentation alignment
+
+### What Changed
+
+Refreshed `AGENTS.md` after re-reading the live project state in `docs/PLAN.md`, `docs/SPEC.md`, `CLAUDE.md`, `docs/BUILD-LOG.md`, `docs/WALK-TESTS.md`, and the active beads queue.
+
+### Key Updates
+
+- Replaced the older long-form workflow with a tighter current-state runbook.
+- Pointed agents at `bd prime` as the dynamic beads workflow source.
+- Updated the current work surface to the open validation items: V2 walk tests, rotation/orb device contract, and Live Activity device validation.
+- Made the V2 product contracts explicit: route-aware corridor primary, simple guidance as labeled fallback, correction-driven orb, mostly silent in-lane state, and real-device haptic gates.
+- Clarified closeout discipline while preserving targeted staging so unrelated local artifacts do not get swept into commits.
+
+### Verification
+
+- Confirmed `AGENTS.md` exists at repo root.
+- Ran `bd onboard`, `bd prime`, `bd ready`, and inspected the active issue details for `bumper-dva.5` and `bumper-dva.7`.
+- `xcodebuild -scheme bumpers -destination 'platform=iOS Simulator,name=iPhone 17' build` passed.
+- `xcodebuild -scheme bumpers -destination 'platform=iOS Simulator,name=iPhone 17' -skip-testing:bumpersUITests test -quiet` passed.
+- Test compile still emits pre-existing Swift 6-mode warnings about main-actor-isolated `Equatable` checks in `HapticCalibrationFlowTests`, `HapticPatternFactoryTests`, and `V2NavigationTests`.
+- No product behavior changed.
+
+---
+
 ## Index of Decisions (Updated)
 
 | Topic | Decision | Session |
