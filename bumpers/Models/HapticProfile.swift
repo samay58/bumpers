@@ -29,6 +29,30 @@ enum HapticProfile: String, CaseIterable, Codable, Identifiable {
         }
     }
 
+    var cooldownScale: TimeInterval {
+        switch self {
+        case .fieldMax: return 0.62
+        case .pocketMax: return 0.82
+        case .pocketNormal, .handheld, .quiet: return 1.0
+        }
+    }
+
+    var continuousDurationScale: TimeInterval {
+        switch self {
+        case .fieldMax: return 1.28
+        case .pocketMax: return 1.08
+        case .pocketNormal, .handheld, .quiet: return 1.0
+        }
+    }
+
+    var wrongWayRumbleDuration: TimeInterval {
+        switch self {
+        case .fieldMax: return 0.58
+        case .pocketMax: return 0.50
+        case .pocketNormal, .handheld, .quiet: return 0.45
+        }
+    }
+
     var allowsOnTrackNod: Bool {
         self != .quiet
     }

@@ -24,12 +24,12 @@ struct HapticPatternFactory {
             return directional(direction: .left, severity: severity, profile: profile, kind: kind)
         case .wrongWay(let direction):
             var events = [
-                continuous(at: 0, duration: 0.45, intensity: 1.0 * profile.energyScale, sharpness: 0.10),
+                continuous(at: 0, duration: profile.wrongWayRumbleDuration, intensity: 1.0 * profile.energyScale, sharpness: 0.10),
             ]
             if let direction {
                 events += signature(direction: direction, severity: .strong, profile: profile, start: 0.60)
             }
-            return HapticPattern(kind: kind, events: events, cooldown: 1.2)
+            return HapticPattern(kind: kind, events: events, cooldown: 1.2 * profile.cooldownScale)
         case .arrival:
             return HapticPattern(
                 kind: kind,
@@ -84,7 +84,7 @@ struct HapticPatternFactory {
             cooldown = 1.2
         }
 
-        return HapticPattern(kind: kind, events: events, cooldown: cooldown)
+        return HapticPattern(kind: kind, events: events, cooldown: cooldown * profile.cooldownScale)
     }
 
     private func signature(
@@ -95,17 +95,19 @@ struct HapticPatternFactory {
     ) -> [HapticEventSpec] {
         let params = parameters(for: severity)
         let scale = profile.energyScale
+        let longDuration = params.longDuration * profile.continuousDurationScale
+        let followUpGap: TimeInterval = 0.05
 
         switch direction {
         case .right:
             return [
                 transient(at: start, intensity: params.shortIntensity * scale, sharpness: params.shortSharpness),
-                continuous(at: start + 0.12, duration: params.longDuration, intensity: params.longIntensity * scale, sharpness: params.longSharpness),
+                continuous(at: start + 0.12, duration: longDuration, intensity: params.longIntensity * scale, sharpness: params.longSharpness),
             ]
         case .left:
             return [
-                continuous(at: start, duration: params.longDuration, intensity: params.longIntensity * scale, sharpness: params.longSharpness),
-                transient(at: start + 0.26, intensity: params.shortIntensity * scale, sharpness: params.shortSharpness),
+                continuous(at: start, duration: longDuration, intensity: params.longIntensity * scale, sharpness: params.longSharpness),
+                transient(at: start + longDuration + followUpGap, intensity: params.shortIntensity * scale, sharpness: params.shortSharpness),
             ]
         }
     }
