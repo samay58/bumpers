@@ -1155,10 +1155,37 @@ Refreshed `AGENTS.md` after re-reading the live project state in `docs/PLAN.md`,
 
 ---
 
+## Session 18: Field Mode Validation Rig
+
+**Date:** 2026-04-30
+**Duration:** Implementation pass
+**Phase:** 6 (Route-Aware V2) - Field validation
+
+### What Changed
+
+Implemented Field Mode as the default validation posture for Bumper V2. The pass makes haptics stronger, setup faster, and active navigation visibly diagnostic so real walks can answer whether iPhone pocket haptics are viable.
+
+### Key Updates
+
+- Added `fieldMax` as the strongest haptic profile.
+- Added preflight controls for left, right, max buzz, and too-weak replay.
+- Added Field Mode corridor sensitivity so drift appears earlier during validation.
+- Added Field Mode orb signal and diagnostics for state, profile, last buzz, and cooldown.
+- Kept low-confidence behavior conservative: no fake directional haptics.
+
+### Verification
+
+- `xcodebuild -scheme bumpers -destination 'platform=iOS Simulator,name=iPhone 17' build` passed.
+- `xcodebuild -scheme bumpers -destination 'platform=iOS Simulator,name=iPhone 17' -skip-testing:bumpersUITests test -quiet` passed.
+- Real-device Field Mode walk testing remains the product gate.
+
+---
+
 ## Index of Decisions (Updated)
 
 | Topic | Decision | Session |
 |-------|----------|---------|
+| Field Mode validation | Default to Field Max, tighter corridor, live diagnostics | 18 |
 | V2 navigation brain | Route-aware soft corridor, crow-flies fallback only | 15 |
 | V2 haptic language | Short-long corrects right, long-short corrects left | 15 |
 | V2 search architecture | Dedicated debounced service/view model with cancellation | 15 |
